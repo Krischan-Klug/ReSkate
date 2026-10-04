@@ -272,6 +272,10 @@ void draw_skate_hud();
 // ReSkate's nametags (nametag_overlay.cpp): polled every presented frame.
 bool nametags_pending();
 void draw_nametags();
+// The Hall of Meat skeleton, counter and card (hall_of_meat_overlay.cpp): polled every
+// presented frame.
+bool hall_of_meat_pending();
+void draw_hall_of_meat();
 // The profiler's HUD (drawn whenever it is on) and window (only in an interactive frame),
 // perf_overlay.cpp.
 bool perf_hud_pending();

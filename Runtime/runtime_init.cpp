@@ -28,6 +28,7 @@
 #include "Extension/Settings/gameplay_settings_override.h"
 #include "Extension/Settings/named_settings.h"
 #include "Extension/Skater/client_source_spawn.h"
+#include "Extension/Skater/hall_of_meat.h"
 #include "Extension/Skater/no_bail.h"
 #include "Extension/Skater/skater_slot_override.h"
 #include "Extension/UI/Startup/startup_window.h"
@@ -368,6 +369,10 @@ extern "C" __declspec(dllexport) BOOL WINAPI DingoSDKDebugInitialize() {
         const bool camera_hook = dingosdk::start_camera_observer(r.base);
         record("{\"event\":\"camera_observer_initialized\",\"active\":" + std::string(camera_hook ? "true" : "false") + "}");
         (void)dingosdk::start_no_bail(r.base);
+        const bool meat = dingosdk::hall_of_meat::start(r.base);
+        if (meat)
+            dingosdk::overlay::set_hall_of_meat_hooks({dingosdk::hall_of_meat::frame, dingosdk::hall_of_meat::enabled});
+        record("{\"event\":\"hall_of_meat_initialized\",\"active\":" + std::string(meat ? "true" : "false") + "}");
         const bool noclip_velocity = dingosdk::start_client_noclip_velocity(r.base);
         record("{\"event\":\"noclip_velocity_initialized\",\"active\":" + std::string(noclip_velocity ? "true" : "false") + "}");
         const bool loading_screens = dingosdk::loading_screen::start(r.base);

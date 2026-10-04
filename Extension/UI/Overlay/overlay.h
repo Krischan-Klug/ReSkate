@@ -316,6 +316,50 @@ struct Nametags {
 };
 using NametagFeed = Nametags (*)();
 void set_nametag_feed(NametagFeed) noexcept;
+// Hall of Meat: the local skater's skeleton over the world while a bail lasts and a few
+// seconds after, each bone coloured by how hard it was hit; a Meat counter while the bail
+// goes on, and its card after. Empty parts draw nothing.
+enum class MeatInjury : std::uint8_t { none, hit, broken };
+struct MeatBone {
+    std::array<float, 3> from{}, to{}; // world space
+    MeatInjury injury{};
+    float flash{}; // 1 the moment it is hit, falling to 0
+};
+struct MeatSkull {
+    std::array<float, 3> centre{}; // world space
+    float radius{};                // metres; 0 = no skull to draw
+    MeatInjury injury{};
+    float flash{};
+};
+struct MeatSkeleton {
+    std::array<float, 16> camera{}; // world matrix: right, up, back, position rows
+    float vertical_fov{};
+    float alpha{}; // fades the whole skeleton out
+    std::vector<MeatBone> bones;
+    MeatSkull skull;
+};
+struct MeatTally {
+    bool live{};   // the bail goes on: the counter shows
+    float card{};  // after it, the card's opacity (0 = no card)
+    int score{};   // the Meat
+    int damage{};
+    int impacts{};
+    int broken{};    // bones
+    int best{};      // on the card: the map's best Meat, this bail included (0 = unknown)
+    bool new_best{}; // this bail set it
+};
+struct MeatFrame {
+    MeatSkeleton skeleton;
+    MeatTally tally;
+};
+struct HallOfMeatHooks {
+    MeatFrame (*frame)() = nullptr; // every presented frame
+    bool (*enabled)() = nullptr;    // the SKATER menu's switch shows this
+};
+void set_hall_of_meat_hooks(HallOfMeatHooks) noexcept;
+// The switch as the hooks report it: available once the game side handed them over.
+bool hall_of_meat_available() noexcept;
+bool hall_of_meat_enabled() noexcept;
 using ParkSurfaceQueue = bool (*)(const EditorSurfaceRequest &);
 void set_park_surface_queue(ParkSurfaceQueue) noexcept;
 using ParkPreviewQueue = bool (*)(const EditorPreviewRequest &);

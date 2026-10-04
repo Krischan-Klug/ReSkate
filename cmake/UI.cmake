@@ -10,6 +10,7 @@ add_library(dingosdk_overlay STATIC
     Extension/UI/Overlay/perf_overlay.cpp
     Extension/UI/Overlay/skate_hud_overlay.cpp
     Extension/UI/Overlay/nametag_overlay.cpp
+    Extension/UI/Overlay/hall_of_meat_overlay.cpp
     Extension/UI/Overlay/chat_emotes.cpp
     Extension/UI/Overlay/console_suggestions.cpp
     Extension/UI/Overlay/skate_menu.cpp
