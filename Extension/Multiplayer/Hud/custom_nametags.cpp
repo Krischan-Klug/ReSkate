@@ -1,10 +1,6 @@
 #include "custom_nametags.h"
 #include "game_ui_state.h"
 #include "Engine/Core/Log/logging.h"
-#include "Engine/Game/Build/addresses.h"
-#include "Engine/Game/Build/20260929/engine.h"
-#include "Engine/Game/Build/20260929/client_source_spawn.h"
-#include "Engine/Core/Platform/memory.h"
 #include "Engine/Game/UI/game_view.h"
 #include <atomic>
 #include <chrono>
@@ -83,27 +79,6 @@ void set_custom_nametags_enabled(bool enabled) noexcept {
 
 bool custom_nametags_enabled() noexcept { return state().enabled.load(std::memory_order_acquire); }
 
-namespace {
-// The camera as it is now: the game updates its own camera after the client update the view
-// was taken in, so a nametag placed with that one trails the picture while the camera turns.
-// Only the same camera object, still of a camera type, with a sound matrix.
-void read_live_view(Address base, GameView &view) noexcept {
-    if (!base || !view.camera || (view.camera & 7)) return;
-    Address vtable{};
-    if (!memory::peek(view.camera, vtable) ||
-        (vtable != base + addr::engine::camera_vtable && vtable != base + addr::client_source_spawn::free_camera_vtable))
-        return;
-    std::array<float, 16> world{};
-    float fov{};
-    if (!memory::peek(view.camera + 0x50, world) || !memory::peek(view.camera + 0xac, fov)) return;
-    if (!std::isfinite(fov) || fov <= 1 || fov >= 175) return;
-    for (const auto value : world)
-        if (!std::isfinite(value) || std::abs(value) > 1e7f) return;
-    view.world = world;
-    view.vertical_fov = fov;
-}
-} // namespace
-
 overlay::Nametags custom_nametags() {
     auto &s = state();
     if (!s.enabled.load(std::memory_order_acquire)) return {};
@@ -115,7 +90,7 @@ overlay::Nametags custom_nametags() {
         result.tags = s.tags;
         view = s.view;
     }
-    read_live_view(s.base.load(std::memory_order_acquire), view);
+    read_live_game_view(s.base.load(std::memory_order_acquire), view);
     result.camera = view.world;
     result.vertical_fov = view.vertical_fov;
     return result;
