@@ -1,6 +1,7 @@
 #include "hall_of_meat.h"
 #include "hall_of_meat_model.h"
 #include "hall_of_meat_skeleton.h"
+#include "local_skater_state.h"
 #include "no_bail.h"
 #include "Engine/Core/Log/logging.h"
 #include "Engine/Core/Platform/memory.h"
@@ -93,6 +94,8 @@ void observe_step(const LocalSkeletonStep& skeleton_step) noexcept {
     const auto now = GetTickCount64();
     Step step;
     step.wipeout = skeleton_step.wipeout;
+    skater_state::SkaterState skater;
+    step.airborne = skater_state::read(skeleton_step.skater, skater) && skater_state::airborne(skater);
     step.peaks = read_peaks(rig);
     Summary ended;
     AcquireSRWLockExclusive(&s.lock);
@@ -137,8 +140,9 @@ void log_bail(const Summary& summary) {
     }
     const auto& tally = summary.tally;
     logging::log(logging::Level::info, logging::Channel::skater,
-        "Hall of Meat: bail over after {:.1f} s, {} Meat ({} damage from {} impacts, {} broken): {}",
+        "Hall of Meat: bail over after {:.1f} s, {} Meat ({} damage from {} impacts, {} broken, {:.1f} s airtime): {}",
         static_cast<double>(summary.duration_ms) / 1000.0, tally.score, tally.damage, tally.impacts, tally.broken,
+        static_cast<double>(tally.airtime),
         hits.empty() ? std::string("no body contact") : hits);
 }
 
@@ -258,6 +262,7 @@ overlay::MeatFrame frame() {
         tally.damage = view.tally.damage;
         tally.impacts = view.tally.impacts;
         tally.broken = view.tally.broken;
+        tally.airtime = view.tally.airtime;
         if (!tally.live) {
             tally.best = standing.best;
             tally.new_best = standing.new_best;

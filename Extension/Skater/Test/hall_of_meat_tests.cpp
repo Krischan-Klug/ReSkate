@@ -139,6 +139,35 @@ void the_meat_adds_up() {
         "the Meat is the hits and the breaks");
 }
 
+// One physics step in the air, hitting nothing.
+Step flying() {
+    Step step;
+    step.airborne = true;
+    return step;
+}
+
+void airtime_is_the_bails_time_in_the_air() {
+    // A fall from height: 4 s in the air, the wipeout a step after the impact.
+    Tracker tracker;
+    std::uint64_t now = t0;
+    for (; now <= t0 + 4000; now += 16) tracker.step(now, flying());
+    tracker.step(now, Step{});                              // the touch-down
+    tracker.step(now + 16, hit(Bone::hips, hit_speed, true)); // the impact's wipeout
+    tracker.step(now + 32, flying());                       // the ragdoll bounces: +16 ms
+    tracker.step(now + 48, Step{});                         // and lies
+    tracker.step(now + 2048, flying());                     // after a pause: longest_step_ms at most
+    check(std::abs(tracker.view(now + 2048).tally.airtime - (4000 + 16 + longest_step_ms) / 1000.0f) < 1e-4f,
+        "the flight before the wipeout and the bail's own flights count");
+    check(tracker.view(now + 2048).tally.score == impact_points(hit_speed), "airtime scores nothing");
+
+    // A clean landing, then a bail later on the ground: that flight is not the bail's.
+    Tracker later;
+    for (now = t0; now <= t0 + 1000; now += 16) later.step(now, flying());
+    later.step(now, Step{});
+    later.step(now + wipeout_after_impact_ms + 16, hit(Bone::hips, hit_speed, true));
+    check(later.view(now + wipeout_after_impact_ms + 16).tally.airtime == 0, "a bail on the ground has no airtime");
+}
+
 void a_bail_sets_a_best_only_by_beating_it() {
     check(standing(0, 300).new_best && standing(0, 300).best == 300, "the first bail on a map sets its best");
     check(!standing(500, 300).new_best && standing(500, 300).best == 500, "a smaller bail keeps it");
@@ -227,6 +256,7 @@ int main() {
         a_reading_clock_behind_the_physics_one_is_harmless();
         one_contact_is_one_impact();
         the_meat_adds_up();
+        airtime_is_the_bails_time_in_the_air();
         a_bail_sets_a_best_only_by_beating_it();
         the_card_follows_the_bail();
         a_point_is_placed_in_its_frame();

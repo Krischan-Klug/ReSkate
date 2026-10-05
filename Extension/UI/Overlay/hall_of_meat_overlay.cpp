@@ -2,6 +2,7 @@
 #include "Extension/UI/skate_theme.h"
 #include <algorithm>
 #include <cmath>
+#include <format>
 
 // Hall of Meat (Extension/Skater/hall_of_meat.h): the local skater's skeleton over the world
 // while a bail lasts and a few seconds after, a Meat counter while it lasts, and the bail's
@@ -160,7 +161,7 @@ void draw_card(const MeatTally& tally, int score, float k) {
     auto* draw = ImGui::GetBackgroundDrawList();
     const auto fade = [&](ImU32 colour) { return with_alpha(colour, tally.card); };
     const float width = 340.0f * k, pad = 18.0f * k, row = 24.0f * k;
-    constexpr int stats = 3;
+    constexpr int stats = 4;
     const float height = pad * 2.0f + 30.0f * k + 52.0f * k + row * stats;
     const float right = ImGui::GetIO().DisplaySize.x - corner_right * k;
     const ImVec2 min(right - width, corner_top * k), max(right, min.y + height);
@@ -190,6 +191,7 @@ void draw_card(const MeatTally& tally, int score, float k) {
     stat("Damage", grouped(tally.damage));
     stat("Impacts", std::to_string(tally.impacts));
     stat("Broken bones", std::to_string(tally.broken));
+    stat("Airtime", std::format("{:.1f} s", tally.airtime));
 }
 }
 

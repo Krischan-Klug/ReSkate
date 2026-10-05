@@ -345,6 +345,7 @@ struct MeatTally {
     int damage{};
     int impacts{};
     int broken{};    // bones
+    float airtime{}; // seconds in the air
     int best{};      // on the card: the map's best Meat, this bail included (0 = unknown)
     bool new_best{}; // this bail set it
 };

@@ -15,11 +15,21 @@ float fading(std::uint64_t since, std::uint64_t duration) noexcept {
 }
 
 bool Tracker::step(std::uint64_t now, const Step& step, Summary* ended) noexcept {
+    const auto flown = step.airborne && stepped_ ? std::min(elapsed(now, stepped_), longest_step_ms) : 0;
+    stepped_ = now;
+    if (step.airborne) landed_ = 0;
+    else if (!landed_) landed_ = now;
     if (!bailing_) {
+        if (step.airborne) flight_ms_ += flown;
+        else if (elapsed(now, landed_) > wipeout_after_impact_ms) flight_ms_ = 0; // landed, and stayed up
         if (!step.wipeout) return false;
+        const auto flight = flight_ms_;
         *this = {};
         bailing_ = true;
-        started_ = tumbled_ = now;
+        started_ = tumbled_ = stepped_ = now;
+        airtime_ms_ = flight; // this step's share is in it
+    } else {
+        airtime_ms_ += flown;
     }
     if (step.wipeout) tumbled_ = now;
     for (std::size_t index = 1; index < body_bones::count; ++index) { // 0 is the board
@@ -57,6 +67,7 @@ Tally Tracker::tally() const noexcept {
     result.impacts = static_cast<int>(impact_count_);
     for (const auto& bone : bones_)
         if (injury(bone.peak) == Injury::broken) ++result.broken;
+    result.airtime = static_cast<float>(airtime_ms_) / 1000.0f;
     result.score = result.damage + result.broken * points_per_break;
     return result;
 }

@@ -15,8 +15,9 @@ using Peaks = std::array<float, body_bones::count>; // metres per second, per bo
 
 // One physics step of the local skater.
 struct Step {
-    bool wipeout{}; // the step asks for a wipeout
-    Peaks peaks{};  // each body bone's hardest impact in the step
+    bool wipeout{};  // the step asks for a wipeout
+    bool airborne{}; // the skater is in the air, on the board or off it (skater_state.h)
+    Peaks peaks{};   // each body bone's hardest impact in the step
 };
 
 enum class Injury : std::uint8_t { none, hit, broken };
@@ -37,6 +38,13 @@ inline constexpr std::uint64_t flash_ms = 350;      // a fresh hit flashes this 
 // this are one impact, as hard as its hardest step.
 inline constexpr std::uint64_t impact_gap_ms = 200;
 inline constexpr std::size_t max_impacts = 64;
+// Airtime adds up the time between physics steps in the air: the flight a bail starts from
+// (the wipeout only comes with the impact) and every flight of the bail after it. A longer
+// gap between steps (a pause) adds this much at most.
+inline constexpr std::uint64_t longest_step_ms = 100;
+// The game reports the wipeout of an impact a few physics steps after the touch-down (0 to 2
+// in the logs of 2026-10-05): until this long on the ground, a bail still takes the flight.
+inline constexpr std::uint64_t wipeout_after_impact_ms = 250;
 
 // The Meat a bail scores: every hit by how hard it was, and each bone broken a bonus once.
 // A hit's points grow faster than its speed but slower than its energy: a 5 m/s hit scores
@@ -64,6 +72,7 @@ struct Tally {
     int damage{};      // the hits' points
     int impacts{};     // hits of at least hit_speed
     int broken{};      // bones
+    float airtime{};   // seconds in the air
     int score{};       // the hits and the breaks: the Meat
 };
 // A bail's score against the best on the same map so far.
@@ -112,7 +121,10 @@ private:
     Tally tally() const noexcept;
 
     bool bailing_{}, hurt_{}; // hurt_: a bone was hit at least at hit_speed this bail
-    std::uint64_t started_{}, tumbled_{}, ended_{};
+    std::uint64_t started_{}, tumbled_{}, ended_{}, stepped_{};
+    std::uint64_t flight_ms_{};  // outside a bail: the last flight, which a bail takes over
+    std::uint64_t landed_{};     // when it touched down; 0 while in the air
+    std::uint64_t airtime_ms_{};
     std::array<BoneState, body_bones::count> bones_{};
     std::array<Impact, max_impacts> impacts_{};
     std::size_t impact_count_{};
