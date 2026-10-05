@@ -23,6 +23,20 @@ struct Published {
     LocalSkater skater;
 };
 Published& published() { static auto* value = new Published; return *value; }
+// The published skater, copied out of the lock; 0 while none is.
+std::uintptr_t published_skater(LocalSkater& skater) noexcept {
+    auto& p = published();
+    AcquireSRWLockShared(&p.lock);
+    const auto base = p.base;
+    skater = p.skater;
+    ReleaseSRWLockShared(&p.lock);
+    return base;
+}
+// The chain still resolves to exactly what was published.
+bool still_resolves(std::uintptr_t base, const LocalSkater& expected) noexcept {
+    LocalSkater live;
+    return resolve_local_skater(base, expected.client, expected.entity, live) && live == expected;
+}
 }
 
 bool resolve_local_skater(std::uintptr_t base, std::uintptr_t client, std::uintptr_t entity, LocalSkater& o) noexcept {
@@ -79,16 +93,19 @@ void clear_local_skater() noexcept {
     ReleaseSRWLockExclusive(&p.lock);
 }
 
+bool current_local_skater(LocalSkater& skater) noexcept {
+    LocalSkater expected;
+    const auto base = published_skater(expected);
+    if (!base || !still_resolves(base, expected)) return false;
+    skater = expected;
+    return true;
+}
 bool local_skater_owns(std::uintptr_t object, std::uintptr_t LocalSkater::* member, LocalSkater* skater) noexcept {
-    auto& p = published();
-    AcquireSRWLockShared(&p.lock);
-    const auto base = p.base;
-    const auto expected = p.skater;
-    ReleaseSRWLockShared(&p.lock);
-    if (!base || !object || object != expected.*member) return false;
-    LocalSkater current;
-    if (!resolve_local_skater(base, expected.client, expected.entity, current) || current != expected) return false;
-    if (skater) *skater = current;
+    LocalSkater expected;
+    const auto base = published_skater(expected);
+    // Compare first: hooks ask about every skater on every step, and most are not ours.
+    if (!base || !object || object != expected.*member || !still_resolves(base, expected)) return false;
+    if (skater) *skater = expected;
     return true;
 }
 }

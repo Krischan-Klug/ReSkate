@@ -360,6 +360,21 @@ void set_hall_of_meat_hooks(HallOfMeatHooks) noexcept;
 // The switch as the hooks report it: available once the game side handed them over.
 bool hall_of_meat_available() noexcept;
 bool hall_of_meat_enabled() noexcept;
+// A debug panel's line: live values the game side names, to watch while playing. A field
+// flashes when its value changes.
+struct DebugField {
+    std::string label, value;
+    float changed{}; // 1 the moment it changed, falling to 0
+    bool heading{};  // a section title: label only
+};
+// The SKATER menu's skater state panel (Extension/Skater/skater_state_debug.h), bottom right.
+struct SkaterStateDebugHooks {
+    std::vector<DebugField> (*fields)() = nullptr; // every presented frame; empty while off
+    bool (*enabled)() = nullptr;                   // the menu's switch shows this
+};
+void set_skater_state_debug_hooks(SkaterStateDebugHooks) noexcept;
+bool skater_state_debug_available() noexcept;
+bool skater_state_debug_enabled() noexcept;
 using ParkSurfaceQueue = bool (*)(const EditorSurfaceRequest &);
 void set_park_surface_queue(ParkSurfaceQueue) noexcept;
 using ParkPreviewQueue = bool (*)(const EditorPreviewRequest &);

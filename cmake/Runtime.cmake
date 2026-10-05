@@ -107,6 +107,8 @@ add_library(dingosdk_runtime SHARED
     Extension/Skater/client_debug.cpp
     Extension/Skater/ai_skaters.cpp
     Extension/Skater/local_skater.cpp
+    Extension/Skater/local_skater_state.cpp
+    Extension/Skater/skater_state_debug.cpp
     Extension/Skater/no_bail.cpp
     Extension/Skater/hall_of_meat.cpp
     Extension/Skater/hall_of_meat_model.cpp

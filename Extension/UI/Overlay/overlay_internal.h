@@ -276,6 +276,9 @@ void draw_nametags();
 // presented frame.
 bool hall_of_meat_pending();
 void draw_hall_of_meat();
+// The skater state debug panel (skater_state_overlay.cpp): polled every presented frame.
+bool skater_state_debug_pending();
+void draw_skater_state_debug();
 // The profiler's HUD (drawn whenever it is on) and window (only in an interactive frame),
 // perf_overlay.cpp.
 bool perf_hud_pending();

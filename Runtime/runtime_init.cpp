@@ -30,6 +30,7 @@
 #include "Extension/Skater/client_source_spawn.h"
 #include "Extension/Skater/hall_of_meat.h"
 #include "Extension/Skater/no_bail.h"
+#include "Extension/Skater/skater_state_debug.h"
 #include "Extension/Skater/skater_slot_override.h"
 #include "Extension/UI/Startup/startup_window.h"
 #include "Extension/World/level_loading.h"
@@ -373,6 +374,7 @@ extern "C" __declspec(dllexport) BOOL WINAPI DingoSDKDebugInitialize() {
         if (meat)
             dingosdk::overlay::set_hall_of_meat_hooks({dingosdk::hall_of_meat::frame, dingosdk::hall_of_meat::enabled});
         record("{\"event\":\"hall_of_meat_initialized\",\"active\":" + std::string(meat ? "true" : "false") + "}");
+        dingosdk::overlay::set_skater_state_debug_hooks({dingosdk::skater_state::debug::fields, dingosdk::skater_state::debug::enabled});
         const bool noclip_velocity = dingosdk::start_client_noclip_velocity(r.base);
         record("{\"event\":\"noclip_velocity_initialized\",\"active\":" + std::string(noclip_velocity ? "true" : "false") + "}");
         const bool loading_screens = dingosdk::loading_screen::start(r.base);

@@ -17,6 +17,9 @@ bool resolve_local_skater(std::uintptr_t image_base, std::uintptr_t client, std:
 // Client tick: publish the local skater, or clear it when it does not resolve.
 bool publish_local_skater(std::uintptr_t image_base, std::uintptr_t client, std::uintptr_t entity) noexcept;
 void clear_local_skater() noexcept;
+// Any thread: the published skater, its chain resolved again now and still exactly what
+// was published.
+bool current_local_skater(LocalSkater& skater) noexcept;
 // Any thread: `object` is the published skater's `member`, and the chain still resolves to
 // exactly what was published. A retained address alone never names another skater after a
 // respawn or level change. `skater` receives the live chain.

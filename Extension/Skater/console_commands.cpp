@@ -2,6 +2,7 @@
 #include "Extension/Profile/local_profile_runtime.h"
 #include "ai_skaters.h"
 #include "hall_of_meat.h"
+#include "skater_state_debug.h"
 #include <format>
 namespace dingosdk::console {
 void register_movement_commands(Commands &registry) {
@@ -64,6 +65,16 @@ void register_movement_commands(Commands &registry) {
         out(on ? "Hall of Meat on." : "Hall of Meat off.");
     };
     registry.add(std::move(meat));
+    auto state_panel = variable("skaterstate", "Skater state debug panel: the local skater's live state, on the board and off it (not saved)",
+        Group::movement, argument("on|off", Type::boolean));
+    state_panel.execution = Execution::local;
+    state_panel.inspect = [](const Model &) { return boolean_state(true, skater_state::debug::enabled()); };
+    state_panel.run = [](const Model &, const Values &args, const Output &out) {
+        const bool on = std::get<bool>(args[0]);
+        skater_state::debug::set_enabled(on);
+        out(on ? "Skater state panel on." : "Skater state panel off.");
+    };
+    registry.add(std::move(state_panel));
     auto speed = argument("speed", Type::number);
     speed.choices = {"0.6", "3", "5", "15", "60", "300", "1500"};
     auto flight = variable("flyspeed", "Free-flight speed in world units per second", Group::movement, speed);

@@ -124,6 +124,13 @@ void movement_controls(SkateMenu& menu, const Model& model, const CallbacksV3& c
     if (!hall_of_meat_available()) note("Unavailable for this game build; see the log.");
     end_card();
 
+    begin_card(menu, "skater-state", "SKATER STATE");
+    bool state_panel = skater_state_debug_enabled();
+    if (toggle_row(menu, "Debug panel", "Show the skater's live state in the bottom right corner: physics state, in the air, on foot, bail. Not saved.",
+            state_panel, skater_state_debug_available() && callbacks.queue_console_command))
+        send_console(menu, callbacks, state_panel ? "skaterstate on" : "skaterstate off");
+    end_card();
+
     begin_card(menu, "boosts", "BOOSTS", "Buttons are set in Settings > Controls");
     ImGui::BeginDisabled(!callbacks.queue_debug);
     field(menu, "Forward boost");

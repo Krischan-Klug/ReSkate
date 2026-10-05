@@ -24,6 +24,7 @@
 #include "Extension/Skater/ai_skaters.h"
 #include "Extension/Skater/client_source_spawn.h"
 #include "Extension/Skater/hall_of_meat.h"
+#include "Extension/Skater/skater_state_debug.h"
 #include "Extension/Skater/skater_slot_override.h"
 #include "Extension/Throwdowns/native_throwdowns.h"
 #include "Extension/Trainer/trainer.h"
@@ -606,6 +607,7 @@ void update_model(std::uintptr_t client, TickState& frame) {
         dingosdk::tick_network_objects();
     }
     if (r.observer_failed) return; // Keep the bounded restore/telemetry path available after catalog failure.
+    dingosdk::skater_state::debug::on_client_tick(); // every tick: a landing lasts a few
     if (!has_request && now < r.next_model && state == r.previous_state) return;
     r.next_model = now + 500;
     DINGO_PROFILE_ZONE("tick/update_model/world model (500 ms)");
