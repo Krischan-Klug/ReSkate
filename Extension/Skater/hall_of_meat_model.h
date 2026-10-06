@@ -32,9 +32,9 @@ struct Step {
     // The body is a ragdoll (skater_state.h Mode::ragdoll); empty when the skater state could not
     // be read: such a step neither starts nor ends a bail by it.
     std::optional<bool> ragdoll;
-    // How fast the skater moves (skater_state.h speed), metres per second; empty when unknown:
-    // such a step neither rests nor stirs the body.
-    std::optional<float> speed;
+    // How the skater moves (skater_state.h velocity), metres per second; empty when unknown: such
+    // a step neither rests nor stirs the body, and adds nothing to its fall or its speed.
+    std::optional<game::Vec3> velocity;
     skater_body::Contacts body; // what each body touched in the step
 };
 
@@ -86,6 +86,14 @@ inline constexpr float vehicle_multiplier = 1.5f;
 inline constexpr float scrape_speed = 1.5f;
 inline constexpr float points_per_scraped_metre = 100.0f;
 inline constexpr float bruising_scrape = 1.0f; // metres one bone slid: it shows as bruised
+// The rest of the bail scores as skate. 3's Hall of Meat did, each stat its own points: its time
+// (falling and sliding, not resting), its airtime, how far the body fell (every metre it went down,
+// from the flight the bail came from on) and its top speed. Its example card scored a 6.2 s bail
+// 5,416, 3.4 s of air 10,816, a 50 m fall 13,251 and 25 MPH 1,590 (from 2026-10-07; to be balanced in game).
+inline constexpr float points_per_second = 600.0f;
+inline constexpr float points_per_air_second = 2000.0f;
+inline constexpr float points_per_metre_fallen = 250.0f;
+inline constexpr float points_per_speed = 130.0f; // per metre per second
 
 constexpr Injury injury(float peak) noexcept {
     return peak >= broken_speed ? Injury::broken : peak >= hit_speed ? Injury::hit : Injury::none;
@@ -124,9 +132,15 @@ struct Tally {
     float scraped{};     // metres the skater slid along surfaces: the road rash
     int scrape_points{};
     int damage{};        // the hits, their bonuses and the road rash
-    int score{};         // the damage and the breaks: the Meat
+    float seconds{};     // falling and sliding, not resting
+    int time_points{};
     float airtime{};     // seconds in the air
-    float hardest{};     // the hardest hit's speed, metres per second
+    int airtime_points{};
+    float fallen{};      // metres the body went down
+    int fall_points{};
+    float top_speed{};   // metres per second
+    int speed_points{};
+    int score{};         // the damage, the breaks, the time, the airtime, the fall and the speed: the Meat
 };
 // A bail's score against the best on the same map before it.
 struct Standing {
@@ -142,7 +156,6 @@ enum class Phase : std::uint8_t { riding, bailing, down, getting_up };
 struct View {
     Phase phase{};
     float alpha{}; // the skeleton's and the card's: 1 through the bail, fading to 0 as the skater gets up
-    std::uint64_t bail_ms{}; // how long the body has been falling and sliding: not while it rests
     std::array<Injury, skater_body::count> injuries{};
     std::array<float, skater_body::count> flashes{}; // 1 at a fresh hit, falling to 0
     Tally tally;
@@ -150,14 +163,12 @@ struct View {
 // The bail at one moment, for the debug panel, whether it hurt a bone or not.
 struct Report {
     Phase phase{};
-    std::uint64_t bail_ms{}; // how long the body has been falling and sliding: not while it rests
     Tally tally;
     bool hit{};              // the bail has a hit: last is it
     Impact last;
 };
 // A finished bail, for the log and the map's best.
 struct Summary {
-    std::uint64_t duration_ms{}; // falling and sliding, not resting
     bool shown{}; // it hurt a bone, so it showed (and counts for a best)
     std::array<float, skater_body::count> peaks{};   // each body's hardest hit
     std::array<float, skater_body::count> scraped{}; // and how far it slid, each on its own
@@ -196,7 +207,7 @@ private:
     bool end(std::uint64_t now, Summary* ended) noexcept;
     Phase phase(std::uint64_t now) const noexcept;
     std::uint64_t bail_ms(std::uint64_t now) const noexcept;
-    Tally tally() const noexcept;
+    Tally tally(std::uint64_t now) const noexcept;
     Injury injury_of(const BoneState& bone) const noexcept;
 
     Phase phase_{};    // riding, bailing or down; getting_up is the fade after a bail's end
@@ -207,9 +218,12 @@ private:
     std::uint64_t rested_at_{};   // down: when the body came to rest
     std::uint64_t rested_ms_{};   // the rests before the current one
     std::uint64_t flight_ms_{};  // while riding: the last flight, which a bail takes over
+    float flight_fallen_{};      // and how far it went down
     std::uint64_t landed_{};     // when it touched down; 0 while in the air
     std::uint64_t airtime_ms_{};
-    float scraped_{}; // metres the skater slid: the road rash
+    float fallen_{};    // metres the body went down
+    float top_speed_{}; // metres per second
+    float scraped_{};   // metres the skater slid: the road rash
     std::array<BoneState, skater_body::count> bones_{};
     std::array<Impact, max_impacts> impacts_{};
     std::size_t impact_count_{};

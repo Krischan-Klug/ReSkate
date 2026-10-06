@@ -2,6 +2,7 @@
 #include "local_skater_state.h"
 #include "Engine/Game/UI/display_format.h"
 #include <format>
+#include <numbers>
 #include <string>
 
 namespace dingosdk::skater_state {
@@ -35,6 +36,9 @@ std::vector<Field> sample() {
     fields.push_back({"Board", motion(s.board_velocity), false, true});
     fields.push_back({"Body (pelvis)", motion(s.body_velocity), false, true});
     fields.push_back({"Vertical", value(s.motion_known ? std::format("{:+.1f} m/s", velocity(s)[1]) : "-"), false, true});
+    const float spin = game::length(s.body_spin) * 180.0f / std::numbers::pi_v<float>;
+    fields.push_back({"Spin (pelvis)", value(s.motion_known ? std::format("{:.0f} deg/s ({:.1f} turns/s)", spin, spin / 360.0f) : "-"),
+        false, true});
     fields.push_back({"OFF THE BOARD", {}, true});
     const auto& f = s.flags;
     fields.push_back({"Substate", value(s.offboard_known ? std::string(substate_name(f.substate)) : "-")});

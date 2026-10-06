@@ -13,7 +13,7 @@ void check(bool value, const char* message) { if (!value) throw std::runtime_err
 void the_overlays_textures_read(const char* game_root) {
     namespace ui = addr::ui_textures;
     vfs::GameTextures textures(game_root);
-    for (const auto& texture : {ui::airtime, ui::wipeout, ui::spread_eagle, ui::stopwatch}) {
+    for (const auto& texture : {ui::airtime, ui::wipeout, ui::spread_eagle, ui::gap_height, ui::stopwatch}) {
         const auto image = textures.read(texture.toc, texture.bundle, texture.name, 64);
         check(image.width == 64 && image.height == 64 && image.rgba.size() == 64 * 64 * 4, "a 64 pixel icon");
     }

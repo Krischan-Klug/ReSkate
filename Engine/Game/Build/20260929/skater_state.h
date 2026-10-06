@@ -63,7 +63,10 @@ inline constexpr std::size_t offboard_block_size = 0x30;
 // reads and writes them (Extension/Skater/client_noclip.cpp). The board's physics: core+0x430 ->
 // +0x18 (vtable board_physics_vtable); the skeleton's: the rig (core+0x438) -> +0x2f10 (vtable
 // rig_physics_vtable). Each keeps its bodies at +0x20: their count (uint32) at the start, body n at
-// n * 0x130, each pointing back to its owner at +0x10 with its velocity (float[3], m/s) at +0x70.
+// n * 0x130, each pointing back to its owner at +0x10 with its velocity (float[3], m/s) at +0x70 and
+// its spin (angular velocity, float[3], radians per second) at +0x90. 0x140fc06b0 syncs a body with
+// the physics world: by its pending flags (+0x60) it sets the velocity (8, 0x1425da600) from +0x70
+// and the spin (0x20, 0x1425d8530) from +0x90.
 // The board has 9, body 0 its root; the skeleton 26, body n the ragdoll's body n (skater_body.h).
 inline constexpr std::uintptr_t board_holder_offset = 0x430;  // core
 inline constexpr std::uintptr_t board_physics_offset = 0x18;  // board holder
@@ -72,6 +75,7 @@ inline constexpr std::uintptr_t physics_bodies_offset = 0x20; // board or rig ph
 inline constexpr std::uintptr_t physics_body_size = 0x130;
 inline constexpr std::uintptr_t body_owner_offset = 0x10;
 inline constexpr std::uintptr_t body_velocity_offset = 0x70;
+inline constexpr std::uintptr_t body_spin_offset = 0x90;
 inline constexpr std::uint32_t board_body_count = 9, rig_body_count = 26;
 inline constexpr std::size_t board_root_body = 0;
 inline constexpr std::uintptr_t board_physics_vtable = client_source_spawn::board_physics_vtable;

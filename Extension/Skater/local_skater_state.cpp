@@ -18,18 +18,23 @@ std::string_view physics_state_name(std::uint32_t id) noexcept {
     return known == names.end() ? std::string_view{} : known->name;
 }
 
-// Body `index` of the board's or the skeleton's physics: its velocity, when the layout holds.
-bool body_velocity(std::uintptr_t physics, std::uintptr_t vtable, std::uint32_t count, std::size_t index,
-    game::Vec3& velocity) noexcept {
+bool finite(const game::Vec3& v) noexcept {
+    return std::all_of(v.begin(), v.end(), [](float value) { return std::isfinite(value) && std::abs(value) < 1000; });
+}
+// Body `index` of the board's or the skeleton's physics, when the layout holds: its velocity, and
+// its spin when asked for.
+bool body_motion(std::uintptr_t physics, std::uintptr_t vtable, std::uint32_t count, std::size_t index,
+    game::Vec3& velocity, game::Vec3* spin = nullptr) noexcept {
     std::uintptr_t type{}, bodies{}, owner{};
     std::uint32_t found{};
     const auto body = [&] { return bodies + index * build::physics_body_size; };
     if (!memory::peek(physics, type) || type != vtable || !memory::peek(physics + build::physics_bodies_offset, bodies) ||
         !memory::peek(bodies, found) || found != count || index >= count ||
         !memory::peek(body() + build::body_owner_offset, owner) || owner != physics ||
-        !memory::peek(body() + build::body_velocity_offset, velocity))
+        !memory::peek(body() + build::body_velocity_offset, velocity) ||
+        (spin && !memory::peek(body() + build::body_spin_offset, *spin)))
         return false;
-    return std::all_of(velocity.begin(), velocity.end(), [](float v) { return std::isfinite(v) && std::abs(v) < 1000; });
+    return finite(velocity) && (!spin || finite(*spin));
 }
 // The board's root and the pelvis.
 bool read_motion(const LocalSkater& skater, SkaterState& state) noexcept {
@@ -37,10 +42,10 @@ bool read_motion(const LocalSkater& skater, SkaterState& state) noexcept {
     return memory::peek(skater.core + build::board_holder_offset, holder) &&
         memory::peek(holder + build::board_physics_offset, board) &&
         memory::peek(skater.rig + build::rig_physics_offset, rig) &&
-        body_velocity(board, skater.base + build::board_physics_vtable, build::board_body_count, build::board_root_body,
+        body_motion(board, skater.base + build::board_physics_vtable, build::board_body_count, build::board_root_body,
             state.board_velocity) &&
-        body_velocity(rig, skater.base + build::rig_physics_vtable, build::rig_body_count, skater_body::index(skater_body::Bone::hips),
-            state.body_velocity);
+        body_motion(rig, skater.base + build::rig_physics_vtable, build::rig_body_count, skater_body::index(skater_body::Bone::hips),
+            state.body_velocity, &state.body_spin);
 }
 
 bool read_offboard(std::uintptr_t core, Offboard& flags) noexcept {
@@ -81,7 +86,7 @@ bool read(const LocalSkater& skater, SkaterState& state) noexcept {
     state.offboard = state.physics_state == build::offboard_physics_state;
     state.offboard_known = read_offboard(skater.core, state.flags);
     state.motion_known = read_motion(skater, state);
-    if (!state.motion_known) state.board_velocity = state.body_velocity = {};
+    if (!state.motion_known) state.board_velocity = state.body_velocity = state.body_spin = {};
     return true;
 }
 }

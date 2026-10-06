@@ -40,9 +40,10 @@ struct SkaterState {
     bool offboard{};            // the physics state is the off-board one: on foot or in a ragdoll
     bool offboard_known{};      // the offboard state was readable
     Offboard flags;
-    // The physics bodies' velocities, metres per second: the board's root, and the skater's pelvis.
+    // The physics bodies' velocities, metres per second: the board's root, and the skater's pelvis;
+    // and the pelvis's spin, radians per second.
     bool motion_known{};
-    game::Vec3 board_velocity{}, body_velocity{};
+    game::Vec3 board_velocity{}, body_velocity{}, body_spin{};
 };
 
 // Whether mode() is known: off the board it takes the offboard state.

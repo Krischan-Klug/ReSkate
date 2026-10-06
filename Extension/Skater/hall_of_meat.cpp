@@ -59,7 +59,7 @@ void observe_step(const skater_body::Step& body_step) noexcept {
     if (skater_state::read(body_step.skater, skater)) {
         step.airborne = skater_state::airborne(skater);
         if (skater_state::mode_known(skater)) step.ragdoll = skater_state::mode(skater) == skater_state::Mode::ragdoll;
-        if (skater.motion_known) step.speed = skater_state::speed(skater);
+        if (skater.motion_known) step.velocity = skater_state::velocity(skater);
     }
     skater_body::read_contacts(body_step.skater, step.body);
     Summary ended;
@@ -88,12 +88,13 @@ void log_bail(const Summary& summary) {
             scrapes += std::format("{}{} {:.1f} m", scrapes.empty() ? "" : ", ", skater_body::names[index], summary.scraped[index]);
     const auto& tally = summary.tally;
     logging::log(logging::Level::info, logging::Channel::skater,
-        "Hall of Meat: bail over after {:.1f} s, {} Meat ({} damage: {} from {} impacts, head +{}, vehicle +{}, "
-        "road rash {:.1f} m +{}; {} broken; {:.1f} s airtime). Hits: {}. Road rash: {}",
-        static_cast<double>(summary.duration_ms) / 1000.0, tally.score, tally.damage, tally.hit_points, tally.impacts,
-        tally.head_bonus, tally.vehicle_bonus, static_cast<double>(tally.scraped), tally.scrape_points, tally.broken,
-        static_cast<double>(tally.airtime), hits.empty() ? std::string("no body contact") : hits,
-        scrapes.empty() ? std::string("none") : scrapes);
+        "Hall of Meat: bail over, {} Meat ({} damage: {} from {} impacts, head +{}, vehicle +{}, road rash {:.1f} m +{}; "
+        "{} broken +{}; {:.1f} s +{}; {:.1f} s airtime +{}; fell {:.1f} m +{}; top speed {:.1f} m/s +{}). Hits: {}. Road rash: {}",
+        tally.score, tally.damage, tally.hit_points, tally.impacts, tally.head_bonus, tally.vehicle_bonus,
+        static_cast<double>(tally.scraped), tally.scrape_points, tally.broken, tally.broken * points_per_break,
+        static_cast<double>(tally.seconds), tally.time_points, static_cast<double>(tally.airtime), tally.airtime_points,
+        static_cast<double>(tally.fallen), tally.fall_points, static_cast<double>(tally.top_speed), tally.speed_points,
+        hits.empty() ? std::string("no body contact") : hits, scrapes.empty() ? std::string("none") : scrapes);
 }
 
 std::string best_key(std::string_view level) {
