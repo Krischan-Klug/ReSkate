@@ -52,6 +52,22 @@ void ui_page(SkateMenu& menu, const Model& model, const CallbacksV3& callbacks) 
         dingosdk::profiler::set_window(window);
     note("Console: perf, perf sample [seconds] [client|present|thread id], perf report, perf status.");
     end_card();
+
+    begin_card(menu, "debug-panel", "DEBUG PANEL");
+    const auto sources = debug_panel_sources();
+    const auto shown = debug_panel_selected();
+    const auto current = std::find_if(sources.begin(), sources.end(), [&](const auto& source) { return source.id == shown; });
+    field(menu, "Shows", "One module's live values in the bottom right corner. Each change is logged. Not saved.");
+    ImGui::BeginDisabled(sources.empty() || !callbacks.queue_console_command);
+    if (ImGui::BeginCombo("##debug-panel", current == sources.end() ? "Off" : current->title.c_str())) {
+        if (ImGui::Selectable("Off", shown.empty())) send_console(menu, callbacks, "debugpanel off");
+        for (const auto& source : sources)
+            if (ImGui::Selectable(source.title.c_str(), source.id == shown)) send_console(menu, callbacks, "debugpanel " + source.id);
+        ImGui::EndCombo();
+    }
+    ImGui::EndDisabled();
+    note("Console: debugpanel <source|off>.");
+    end_card();
     if (!model.steam_offline) multiplayer_display_settings(menu, model);
 }
 
