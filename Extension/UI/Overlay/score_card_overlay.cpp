@@ -13,8 +13,8 @@ namespace dingosdk::overlay::detail {
 namespace {
 namespace theme = dingosdk::skate_theme;
 using display_format::grouped;
-// From the screen's top right corner, in 1080p pixels.
-constexpr float corner_right = 48.0f, corner_top = 96.0f, card_width = 320.0f;
+// From the screen's top right corner, in 1080p pixels; as wide as the logo it carries.
+constexpr float corner_right = 48.0f, corner_top = 96.0f, card_width = 250.0f;
 
 ImU32 with_alpha(ImU32 colour, float alpha) {
     const auto a = static_cast<unsigned>(((colour >> IM_COL32_A_SHIFT) & 0xff) * std::clamp(alpha, 0.0f, 1.0f));
@@ -56,7 +56,7 @@ void draw_score_card(const ScoreCard& card, ScoreCardCount& counted) {
     unsigned seed = 211u;
 
     // A tile per stat: its icon, what was measured, and what it scored.
-    const float row_height = 36.0f * k, icon = 24.0f * k, text = 20.0f * k;
+    const float row_height = 32.0f * k, icon = 22.0f * k, text = 18.0f * k;
     for (const auto& row : card.rows) {
         const ImVec2 min(left, y), max(right, y + row_height);
         theme::rough_rect(draw, min, max, fade(with_alpha(theme::tile, 0.9f)), ++seed, k);
@@ -74,8 +74,8 @@ void draw_score_card(const ScoreCard& card, ScoreCardCount& counted) {
         y += row_height + 6.0f * k;
     }
 
-    // The panel: the logo, the title, the total and the badge, centred, with skate.'s blue edge.
-    const float logo_height = 76.0f * k, title_size = 22.0f * k, total_size = 56.0f * k, badge_size = 18.0f * k;
+    // The panel: the logo across it, the title, the total and the badge, centred, with skate.'s blue edge.
+    const float logo_height = 72.0f * k, title_size = 22.0f * k, total_size = 56.0f * k, badge_size = 18.0f * k;
     const float height = pad * 2.0f + (card.logo.empty() ? 0.0f : logo_height + 4.0f * k) + title_size + total_size +
                          (card.badge.empty() ? 0.0f : badge_size + 4.0f * k);
     const ImVec2 min(left, y), max(right, y + height);

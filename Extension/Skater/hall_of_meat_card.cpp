@@ -19,7 +19,9 @@ constexpr const char* speed_icon = "hallofmeat/flaming_wheel";
 constexpr const char* logo = "hallofmeat/thrasher";
 
 overlay::GameImage image(const char* key, const ui::Texture& texture, std::uint32_t side) {
-    return {key, std::string(texture.toc), std::string(texture.bundle), std::string(texture.name), side, true};
+    const auto& r = texture.region;
+    return {key, std::string(texture.toc), std::string(texture.bundle), std::string(texture.name), side, true,
+        {r.left, r.top, r.right, r.bottom}};
 }
 std::string hits(int value) { return grouped(value) + (value == 1 ? " hit" : " hits"); }
 }
@@ -28,7 +30,7 @@ std::vector<overlay::GameImage> card_images() {
     return {image(duration_icon, ui::stopwatch, icon_side), image(hits_icon, ui::wipeout, icon_side),
         image(broken_icon, ui::wipeout_broken, icon_side), image(road_rash_icon, ui::spread_eagle, icon_side),
         image(airtime_icon, ui::airtime, icon_side), image(speed_icon, ui::flaming_wheel, icon_side),
-        image(logo, ui::thrasher_logo, logo_side)};
+        image(logo, ui::thrasher_wordmark, logo_side)};
 }
 
 overlay::ScoreCard score_card(const View& view, const Standing& against) {

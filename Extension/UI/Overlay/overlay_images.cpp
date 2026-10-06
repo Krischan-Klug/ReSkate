@@ -33,13 +33,30 @@ std::filesystem::path game_root() {
     return std::filesystem::path(std::wstring(path.data(), length)).parent_path();
 }
 
+// The part of `image` that `region` names (fractions of its width and height).
+frostbite::Image cropped(const frostbite::Image& image, const std::array<float, 4>& region) {
+    const auto [left, top, right, bottom] = region;
+    if (!(left >= 0 && top >= 0 && right <= 1 && bottom <= 1 && left < right && top < bottom))
+        throw std::runtime_error("its region is not inside it");
+    const auto x0 = static_cast<std::uint32_t>(left * static_cast<float>(image.width) + 0.5f);
+    const auto y0 = static_cast<std::uint32_t>(top * static_cast<float>(image.height) + 0.5f);
+    const auto x1 = std::max(x0 + 1, static_cast<std::uint32_t>(right * static_cast<float>(image.width) + 0.5f));
+    const auto y1 = std::max(y0 + 1, static_cast<std::uint32_t>(bottom * static_cast<float>(image.height) + 0.5f));
+    if (x1 > image.width || y1 > image.height) throw std::runtime_error("its region is not inside it");
+    frostbite::Image result{x1 - x0, y1 - y0, std::vector<std::uint8_t>(std::size_t{x1 - x0} * (y1 - y0) * 4)};
+    for (std::uint32_t y = y0; y < y1; ++y)
+        std::memcpy(result.rgba.data() + std::size_t{y - y0} * result.width * 4,
+                    image.rgba.data() + (std::size_t{y} * image.width + x0) * 4, std::size_t{result.width} * 4);
+    return result;
+}
+
 std::vector<Decoded> decode(const std::vector<GameImage>& images) {
     std::vector<Decoded> result;
     try {
         vfs::GameTextures textures(game_root());
         for (const auto& request : images) {
             try {
-                auto image = textures.read(request.toc, request.bundle, request.name, request.side);
+                auto image = cropped(textures.read(request.toc, request.bundle, request.name, request.side), request.region);
                 if (request.silhouette)
                     for (std::size_t i = 0; i < image.rgba.size(); i += 4) image.rgba[i] = image.rgba[i + 1] = image.rgba[i + 2] = 255;
                 result.push_back({request.key, std::move(image)});

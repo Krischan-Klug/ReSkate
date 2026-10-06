@@ -22,7 +22,7 @@ void the_overlays_textures_read(const char* game_root) {
     const auto wheel = textures.read(ui::flaming_wheel.toc, ui::flaming_wheel.bundle, ui::flaming_wheel.name, 64);
     check(wheel.width == 64 && wheel.height == 64, "a larger icon is taken from a smaller mip");
     // Streamed: the full size comes from the TOC's own chunk, not the bundle's small mips.
-    const auto logo = textures.read(ui::thrasher_logo.toc, ui::thrasher_logo.bundle, ui::thrasher_logo.name, 512);
+    const auto logo = textures.read(ui::thrasher_wordmark.toc, ui::thrasher_wordmark.bundle, ui::thrasher_wordmark.name, 512);
     check(logo.width == 512 && logo.height == 256, "the streamed logo at full size");
     bool opaque{}, clear{};
     for (std::size_t i = 3; i < logo.rgba.size(); i += 4) (logo.rgba[i] ? opaque : clear) = true;
