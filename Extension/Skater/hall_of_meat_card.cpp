@@ -21,7 +21,7 @@ constexpr const char* logo = "hallofmeat/thrasher";
 overlay::GameImage image(const char* key, const ui::Texture& texture, std::uint32_t side) {
     const auto& r = texture.region;
     return {key, std::string(texture.toc), std::string(texture.bundle), std::string(texture.name), side, true,
-        {r.left, r.top, r.right, r.bottom}};
+        frostbite::ImageRegion{r.left, r.top, r.right, r.bottom}};
 }
 std::string hits(int value) { return grouped(value) + (value == 1 ? " hit" : " hits"); }
 }

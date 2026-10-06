@@ -15,6 +15,7 @@
 #include "Engine/Game/Skater/skater_body.h"
 
 #include "Engine/Core/Console/console_entry.h"
+#include "Engine/Resource/image_region.h"
 
 #include <array>
 #include <cstddef>
@@ -349,8 +350,7 @@ struct GameImage {
     std::string toc, bundle, name; // the texture: superbundle TOC, bundle, resource name
     std::uint32_t side{};          // the texture fitted into a side x side square, its aspect kept
     bool silhouette{};             // white with the texture's own alpha, to be drawn in any colour
-    // The part of the texture kept, as fractions of its width and height (left, top, right, bottom).
-    std::array<float, 4> region{0, 0, 1, 1};
+    frostbite::ImageRegion region{}; // the part of the texture kept
 };
 void add_game_images(std::vector<GameImage> images);
 // A result card for any feature (score_card_overlay.cpp), laid out like skate. 3's Hall of Meat
