@@ -9,7 +9,13 @@ using debug_panel::Field;
 
 std::string seconds(std::uint64_t ms) { return std::format("{:.1f} s", static_cast<double>(ms) / 1000.0); }
 std::string_view phase_name(Phase phase) {
-    return phase == Phase::bailing ? "bailing" : phase == Phase::lingering ? "lingering" : "riding";
+    switch (phase) {
+    case Phase::falling: return "falling";
+    case Phase::down: return "down";
+    case Phase::getting_up: return "getting up";
+    case Phase::riding: break;
+    }
+    return "riding";
 }
 // What made a hit count more: "head", "vehicle", both or nothing.
 std::string bonuses(const Impact& impact) {

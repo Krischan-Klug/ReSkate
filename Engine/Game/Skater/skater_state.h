@@ -41,7 +41,10 @@ struct SkaterState {
     Offboard flags;
 };
 
-// On the board, on foot, or in a ragdoll.
+// Whether mode() is known: off the board it takes the offboard state.
+constexpr bool mode_known(const SkaterState& state) noexcept { return !state.offboard || state.offboard_known; }
+// On the board, on foot, or in a ragdoll. A ragdoll lasts from a bail's wipeout (or the flight
+// before it) until the skater stands up (measured 2026-10-06), and also covers rolls on foot.
 constexpr Mode mode(const SkaterState& state) noexcept {
     if (!state.offboard) return Mode::on_board;
     return state.offboard_known && state.flags.substate == Substate::ragdoll ? Mode::ragdoll : Mode::on_foot;

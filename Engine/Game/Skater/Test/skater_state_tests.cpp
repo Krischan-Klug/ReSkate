@@ -45,6 +45,8 @@ void an_unreadable_offboard_state_says_nothing() {
     auto unknown = off_board(true, Substate::ragdoll);
     unknown.offboard_known = false;
     check(mode(unknown) == Mode::on_foot && !airborne(unknown), "without the offboard state: on foot, not in the air");
+    check(!mode_known(unknown), "and the mode is not known");
+    check(mode_known(on_board(false)) && mode_known(off_board(false)), "on the board, and off it with the offboard state, it is");
 }
 }
 

@@ -5,10 +5,10 @@
 #include <format>
 
 // Hall of Meat (Extension/Skater/hall_of_meat.h): the local skater's skeleton over the world
-// while a bail lasts and a few seconds after, a Meat counter while it lasts, and the bail's
-// card after it. The game side hands over the posed skeleton mesh in world space with the live
-// camera, drawn as the overlay's x-ray (skeleton_overlay.cpp) in each body's injury colour. The counter and card are drawn in skate.'s
-// menu style like the S.K.A.T.E. HUD. All of it on the background draw list, under
+// from their bail until they get up, a Meat counter while the body tumbles, and the bail's
+// card once it lies. The game side hands over the posed skeleton mesh in world space with the
+// live camera, drawn as the overlay's x-ray (skeleton_overlay.cpp) in each body's injury
+// colour. The counter and card are drawn in skate.'s menu style like the S.K.A.T.E. HUD. All of it on the background draw list, under
 // ReSkate's own menus and chat, taking no input.
 
 namespace dingosdk::overlay {
@@ -84,10 +84,10 @@ void draw_meat_skeleton(const MeatSkeleton& value) {
 }
 
 // The counter and the card share the top right corner (1080p pixels from its edges): the
-// counter while the bail lasts, the card after it.
+// counter while the body tumbles, the card once it lies.
 constexpr float corner_right = 48.0f, corner_top = 96.0f;
 
-// While the bail lasts: MEAT and the score, counting up, on a plate.
+// While the body tumbles: MEAT and the score, counting up, on a plate.
 void draw_counter(int score, float k) {
     auto& s = state();
     auto* heading = s.menu.heading ? s.menu.heading : ImGui::GetFont();
@@ -108,8 +108,8 @@ void draw_counter(int score, float k) {
              theme::white, number.c_str());
 }
 
-// After the bail: its card, with the score and what made it. The bones it hurt show on
-// the skeleton.
+// Once the body lies: the bail's card, with the score and what made it. The bones it hurt show
+// on the skeleton.
 void draw_card(const MeatTally& tally, int score, float k) {
     auto& s = state();
     auto* title = s.menu.title ? s.menu.title : ImGui::GetFont();

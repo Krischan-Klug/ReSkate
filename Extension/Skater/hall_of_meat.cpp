@@ -1,5 +1,6 @@
 #include "hall_of_meat.h"
 #include "hall_of_meat_model.h"
+#include "local_skater.h"
 #include "local_skater_body.h"
 #include "local_skater_state.h"
 #include "skeleton_mesh.h"
@@ -26,7 +27,7 @@ struct State {
     bool summary_pending{};
     Summary summary;
     // The current map's best Meat (known once the client tick named the map), where the last
-    // bail that showed stands against it, and whether a new best is still to be saved.
+    // finished bail that showed stands against it, and whether a new best is still to be saved.
     bool best_known{}, best_unsaved{};
     int best{};
     Standing standing;
@@ -34,8 +35,19 @@ struct State {
 };
 State& state() { static auto* value = new State; return *value; }
 
+// A bail is over (under the lock): it is logged on the client tick, and stands against the map's best.
+void finished(State& s, const Summary& ended) noexcept {
+    s.summary = ended;
+    s.summary_pending = true;
+    s.standing = ended.shown && s.best_known ? standing(s.best, ended.tally.score) : Standing{};
+    if (s.standing.new_best) {
+        s.best = s.standing.best;
+        s.best_unsaved = true;
+    }
+}
+
 // Physics thread, every step of the local skater (local_skater_body.h): what each body touched
-// in the step, and so what the bail did to it.
+// in the step and whether it is a ragdoll, and so where the bail is and what it did.
 void observe_step(const skater_body::Step& body_step) noexcept {
     auto& s = state();
     if (!s.enabled.load(std::memory_order_acquire)) return;
@@ -43,19 +55,14 @@ void observe_step(const skater_body::Step& body_step) noexcept {
     Step step;
     step.wipeout = body_step.wipeout;
     skater_state::SkaterState skater;
-    step.airborne = skater_state::read(body_step.skater, skater) && skater_state::airborne(skater);
+    if (skater_state::read(body_step.skater, skater)) {
+        step.airborne = skater_state::airborne(skater);
+        if (skater_state::mode_known(skater)) step.ragdoll = skater_state::mode(skater) == skater_state::Mode::ragdoll;
+    }
     skater_body::read_contacts(body_step.skater, step.body);
     Summary ended;
     AcquireSRWLockExclusive(&s.lock);
-    if (s.tracker.step(now, step, &ended)) {
-        s.summary = ended;
-        s.summary_pending = true;
-        s.standing = ended.shown && s.best_known ? standing(s.best, ended.tally.score) : Standing{};
-        if (s.standing.new_best) {
-            s.best = s.standing.best;
-            s.best_unsaved = true;
-        }
-    }
+    if (s.tracker.step(now, step, &ended)) finished(s, ended);
     ReleaseSRWLockExclusive(&s.lock);
 }
 
@@ -123,32 +130,41 @@ bool start() noexcept {
     return true;
 }
 
-void on_client_tick(std::string_view level) noexcept {
+void on_client_tick() noexcept {
     auto& s = state();
     if (!s.ready.load(std::memory_order_acquire)) return;
     try {
-        if (level != s.level) {
-            s.level = level;
-            const int best = level.empty() ? 0 : saved_best(level);
-            AcquireSRWLockExclusive(&s.lock);
-            s.best_known = !level.empty();
-            s.best = best;
-            s.best_unsaved = false;
-            s.standing = {};
-            ReleaseSRWLockExclusive(&s.lock);
-        }
-        Summary summary;
-        bool finished{}, unsaved{};
+        LocalSkater skater;
+        const bool gone = !current_local_skater(skater);
+        const auto now = GetTickCount64();
+        Summary summary, ended;
+        bool pending{}, unsaved{};
         int best{};
         AcquireSRWLockExclusive(&s.lock);
-        std::swap(finished, s.summary_pending);
-        if (finished) summary = s.summary;
+        if (gone && s.tracker.lose(now, &ended)) finished(s, ended);
+        std::swap(pending, s.summary_pending);
+        if (pending) summary = s.summary;
         std::swap(unsaved, s.best_unsaved);
         best = s.best;
         ReleaseSRWLockExclusive(&s.lock);
-        if (finished) log_bail(summary);
+        if (pending) log_bail(summary);
         if (unsaved && !s.level.empty()) profile_runtime::set_local_values({{best_key(s.level), static_cast<double>(best)}});
     } catch (...) { /* A lost log line or best is never worth the client tick. */ }
+}
+
+void set_level(std::string_view level) noexcept {
+    auto& s = state();
+    if (!s.ready.load(std::memory_order_acquire) || level == s.level) return;
+    try {
+        s.level = level;
+        const int best = level.empty() ? 0 : saved_best(level);
+        AcquireSRWLockExclusive(&s.lock);
+        s.best_known = !level.empty();
+        s.best = best;
+        s.best_unsaved = false;
+        s.standing = {};
+        ReleaseSRWLockExclusive(&s.lock);
+    } catch (...) { /* The map's best stays unknown: no card shows one. */ }
 }
 
 bool enabled() noexcept {
@@ -182,15 +198,16 @@ overlay::MeatFrame frame() {
     if (!enabled()) return {};
     const auto now = GetTickCount64();
     View view;
-    Standing standing;
+    Standing against; // the card's: the bail against the map's best before it
     AcquireSRWLockExclusive(&s.lock);
     view = s.tracker.view(now);
-    standing = s.standing;
+    if (view.phase == Phase::down) against = s.best_known ? standing(s.best, view.tally.score) : Standing{};
+    else if (view.phase == Phase::getting_up) against = s.standing; // the best already counts this bail
     ReleaseSRWLockExclusive(&s.lock);
 
     overlay::MeatFrame result;
     auto& tally = result.tally;
-    tally.live = view.bailing;
+    tally.live = view.phase == Phase::falling;
     tally.card = view.card;
     if (tally.live || tally.card > 0) {
         tally.score = view.tally.score;
@@ -200,15 +217,15 @@ overlay::MeatFrame frame() {
         tally.road_rash = view.tally.scraped;
         tally.airtime = view.tally.airtime;
         if (!tally.live) {
-            tally.best = standing.best;
-            tally.new_best = standing.new_best;
+            tally.best = against.best;
+            tally.new_best = against.new_best;
         }
     }
     // The skeleton as the renderer drew the skater in the latest picture, seen by its camera.
     const auto mesh = skater_skeleton::mesh();
     skater_render::Picture picture;
     skater_skeleton::Posed posed;
-    if (!mesh || !view.visible || !skater_render::latest(picture) || !skater_skeleton::pose(*mesh, picture.skin, posed))
+    if (!mesh || view.phase == Phase::riding || !skater_render::latest(picture) || !skater_skeleton::pose(*mesh, picture.skin, posed))
         return result;
     auto& skeleton = result.skeleton;
     skeleton.frame.camera = picture.camera;
