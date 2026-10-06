@@ -12,12 +12,14 @@
 #include "Engine/Game/Multiplayer/session_model.h"
 #include "Engine/Game/UI/menu_scale.h"
 #include "Engine/Game/Skater/first_person_spring.h"
+#include "Engine/Game/Skater/skater_body.h"
 
 #include "Engine/Core/Console/console_entry.h"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -329,6 +331,49 @@ struct Nametags {
 };
 using NametagFeed = Nametags (*)();
 void set_nametag_feed(NametagFeed) noexcept;
+// skate.'s own skeleton mesh posed for one frame (Engine/Game/Skater/skater_skeleton.h), in world
+// space with the camera to see it from: any feature's to show (skeleton_overlay.cpp).
+struct SkeletonFrame {
+    std::array<float, 16> camera{}; // world matrix: right, up, back, position rows
+    float vertical_fov{};
+    std::vector<std::array<float, 3>> positions, normals;        // world space, one per vertex
+    std::shared_ptr<const std::vector<std::uint32_t>> triangles; // vertex indices, three a triangle
+    std::shared_ptr<const std::vector<std::uint8_t>> parts;      // each vertex's body (skater_body.h)
+};
+// Hall of Meat: the local skater's skeleton over the world while a bail lasts and a few
+// seconds after, each body coloured by how hard it was hit; a Meat counter while the bail
+// goes on, and its card after. Empty parts draw nothing.
+enum class MeatInjury : std::uint8_t { none, hit, broken };
+struct MeatSkeleton {
+    SkeletonFrame frame;
+    float alpha{}; // fades the whole skeleton out
+    std::array<MeatInjury, skater_body::count> injuries{}; // each body's
+    std::array<float, skater_body::count> flashes{};       // 1 the moment it is hit, falling to 0
+};
+struct MeatTally {
+    bool live{};   // the bail goes on: the counter shows
+    float card{};  // after it, the card's opacity (0 = no card)
+    int score{};   // the Meat
+    int damage{};
+    int impacts{};
+    int broken{};      // bones
+    float road_rash{}; // metres the body slid along the ground
+    float airtime{};   // seconds in the air
+    int best{};      // on the card: the map's best Meat, this bail included (0 = unknown)
+    bool new_best{}; // this bail set it
+};
+struct MeatFrame {
+    MeatSkeleton skeleton;
+    MeatTally tally;
+};
+struct HallOfMeatHooks {
+    MeatFrame (*frame)() = nullptr; // every presented frame
+    bool (*enabled)() = nullptr;    // the SKATER menu's switch shows this
+};
+void set_hall_of_meat_hooks(HallOfMeatHooks) noexcept;
+// The switch as the hooks report it: available once the game side handed them over.
+bool hall_of_meat_available() noexcept;
+bool hall_of_meat_enabled() noexcept;
 // The debug panel (Extension/Debug/debug_panel.h): one source's live values in the bottom
 // right corner. A field flashes when its value changes.
 struct DebugField {

@@ -75,7 +75,9 @@ add_library(dingosdk_frostbite STATIC
     Engine/Resource/bundle_ref_table.cpp
     Engine/Resource/ebx_writer.cpp
     Engine/Resource/toc.cpp
-    Engine/Resource/texture.cpp)
+    Engine/Resource/texture.cpp
+    Engine/Resource/mesh_set.cpp
+    Engine/Resource/skeleton_asset.cpp)
 target_include_directories(dingosdk_frostbite SYSTEM PRIVATE External/bcdec)
 target_link_libraries(dingosdk_frostbite PRIVATE dingosdk_lz4 dingosdk_zstd dingosdk_miniz)
 

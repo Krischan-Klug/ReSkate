@@ -26,9 +26,12 @@
 #include "Extension/Progression/neighborhood_unlock_override.h"
 #include "Extension/Progression/progression_service_guard.h"
 #include "Extension/Rendering/graphics_labels.h"
+#include "Extension/Rendering/local_skater_render.h"
 #include "Extension/Settings/gameplay_settings_override.h"
 #include "Extension/Settings/named_settings.h"
 #include "Extension/Skater/client_source_spawn.h"
+#include "Extension/Skater/hall_of_meat.h"
+#include "Extension/Skater/hall_of_meat_debug.h"
 #include "Extension/Skater/local_skater_body.h"
 #include "Extension/Skater/no_bail.h"
 #include "Extension/Skater/skater_body_debug.h"
@@ -374,8 +377,15 @@ extern "C" __declspec(dllexport) BOOL WINAPI DingoSDKDebugInitialize() {
         (void)dingosdk::start_no_bail(r.base);
         const bool body = dingosdk::skater_body::start(r.base);
         record("{\"event\":\"skater_body_initialized\",\"active\":" + std::string(body ? "true" : "false") + "}");
+        const bool render = dingosdk::skater_render::start(r.base);
+        record("{\"event\":\"skater_render_initialized\",\"active\":" + std::string(render ? "true" : "false") + "}");
+        const bool meat = dingosdk::hall_of_meat::start();
+        if (meat)
+            dingosdk::overlay::set_hall_of_meat_hooks({dingosdk::hall_of_meat::frame, dingosdk::hall_of_meat::enabled});
+        record("{\"event\":\"hall_of_meat_initialized\",\"active\":" + std::string(meat ? "true" : "false") + "}");
         dingosdk::debug_panel::add(dingosdk::skater_state::debug_source());
         if (body) dingosdk::debug_panel::add(dingosdk::skater_body::debug_source());
+        if (meat) dingosdk::debug_panel::add(dingosdk::hall_of_meat::debug_source());
         dingosdk::overlay::set_debug_panel_hooks(
             {dingosdk::debug_panel::panel, dingosdk::debug_panel::sources, dingosdk::debug_panel::selected});
         const bool noclip_velocity = dingosdk::start_client_noclip_velocity(r.base);

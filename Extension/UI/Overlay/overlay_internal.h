@@ -272,6 +272,17 @@ void draw_skate_hud();
 // ReSkate's nametags (nametag_overlay.cpp): polled every presented frame.
 bool nametags_pending();
 void draw_nametags();
+// The Hall of Meat skeleton, counter and card (hall_of_meat_overlay.cpp): polled every
+// presented frame.
+bool hall_of_meat_pending();
+void draw_hall_of_meat();
+// skate.'s skeleton mesh as an x-ray over the world (skeleton_overlay.cpp), for any feature: each
+// body in its paint, an opaque colour, from an x-ray's faint middle (solid 0) to solid (1).
+struct SkeletonPaint {
+    ImU32 colour{};
+    float solid{};
+};
+void draw_skeleton(const SkeletonFrame& skeleton, const std::array<SkeletonPaint, skater_body::count>& paints, float alpha);
 // The debug panel (debug_panel_overlay.cpp): polled every presented frame.
 bool debug_panel_pending();
 void draw_debug_panel();
