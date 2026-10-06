@@ -62,15 +62,10 @@ bool Tracker::step(std::uint64_t now, const Step& step, Summary* ended) noexcept
     return stood_up && end(now, ended);
 }
 
-// Whether the body rests, by how fast it moves: its time and its points stop while it does.
+// Whether the body has come to rest, by how fast it moves: then the bail's time and points are final.
 void Tracker::rest(std::uint64_t now, std::optional<float> speed) noexcept {
-    if (!speed) return;
-    if (phase_ == Phase::down) {
-        if (*speed <= moving_speed) return;
-        rested_ms_ += elapsed(now, rested_at_);
-        rested_at_ = still_since_ = 0;
-        phase_ = Phase::bailing;
-    } else if (*speed >= still_speed) {
+    if (phase_ != Phase::bailing || !speed) return;
+    if (*speed >= still_speed) {
         still_since_ = 0;
     } else if (!still_since_) {
         still_since_ = now;
@@ -157,11 +152,9 @@ bool Tracker::end(std::uint64_t now, Summary* ended) noexcept {
     return true;
 }
 
+// The bail's time: until the body came to rest, or the bail ended, or now.
 std::uint64_t Tracker::bail_ms(std::uint64_t now) const noexcept {
-    const auto until = phase_ == Phase::riding ? ended_ : now;
-    const auto lasted = elapsed(until, started_);
-    const auto rested = rested_ms_ + (rested_at_ ? elapsed(until, rested_at_) : 0);
-    return lasted - std::min(lasted, rested);
+    return elapsed(rested_at_ ? rested_at_ : phase_ == Phase::riding ? ended_ : now, started_);
 }
 
 Phase Tracker::phase(std::uint64_t now) const noexcept {

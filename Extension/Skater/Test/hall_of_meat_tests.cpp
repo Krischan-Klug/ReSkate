@@ -169,7 +169,7 @@ void a_bail_lasts_until_the_skater_gets_up() {
     check(tracker.view(now + fade_ms + 16).injuries[skater_body::index(Bone::hips)] == Injury::none, "a new bail starts clean");
 }
 
-void the_bail_rests_while_the_body_lies_still() {
+void a_rest_ends_the_counting() {
     Tracker tracker;
     tracker.step(t0, hit(Bone::hips, 7.0f, true));
     auto now = keep(tracker, t0 + 16, 1000, moving(4.0f));
@@ -183,17 +183,22 @@ void the_bail_rests_while_the_body_lies_still() {
     twitch.velocity = game::Vec3{0.3f, 0, 0}; // a bone twitches, the body barely moves
     tracker.step(now, twitch);
     check(tracker.report(now).phase == Phase::down && tracker.view(now).tally.impacts == 1, "a twitch at rest scores nothing");
+    const auto rested = tracker.view(now).tally;
     const auto later = now + 3000;
     check(near(tracker.view(later).tally.seconds, seconds(went_still - t0)), "however long it lies");
-    auto thrown = hit(Bone::neck1, 9.0f);
-    thrown.velocity = game::Vec3{5.0f, 0, 0}; // a car throws the body again
-    tracker.step(later, thrown);
-    check(tracker.report(later).phase == Phase::bailing && tracker.view(later).tally.impacts == 2,
-        "moving again, the bail goes on");
-    check(near(tracker.view(later + 1000).tally.seconds, seconds(went_still - t0 + 1000)), "and so does its time");
+    // Getting up starts inside the ragdoll and moves the body fast again: nothing more counts.
+    auto getting_up = hit(Bone::left_foot, 6.0f);
+    getting_up.velocity = game::Vec3{0, 3.0f, 2.0f};
+    now = keep(tracker, later, 600, getting_up);
+    const auto final = tracker.view(now).tally;
+    check(tracker.report(now).phase == Phase::down && final.score == rested.score && final.impacts == rested.impacts &&
+              near(final.seconds, rested.seconds) && near(final.top_speed, rested.top_speed),
+        "getting up adds no time and no points");
     Summary summary;
-    tracker.step(later + 1000, standing_up(), &summary);
-    check(near(summary.tally.seconds, seconds(went_still - t0 + 1000)), "the bail's time leaves its rests out");
+    tracker.step(now, standing_up(), &summary);
+    check(summary.tally.score == rested.score && near(summary.tally.seconds, seconds(went_still - t0)),
+        "the bail ends as it was when the body came to rest");
+    check(tracker.view(now + fade_ms / 2).tally.score == rested.score, "and fades out so");
     Tracker unknown;
     unknown.step(t0, hit(Bone::hips, 7.0f, true));
     check(unknown.report(keep(unknown, t0 + 16, 2000, lying())).phase == Phase::bailing, "an unknown speed never rests");
@@ -304,9 +309,9 @@ void sliding_along_the_ground_is_road_rash() {
     for (int i = 0; i < 50; ++i) tracker.step(now += 20, slide(Bone::hips, 5.0f)); // a second at 5 m/s
     const auto view = tracker.view(now);
     check(view.phase == Phase::bailing, "a sliding bail goes on");
-    check(std::abs(view.tally.scraped - 5.0f) < 1e-3f && view.tally.scrape_points == 500, "5 m of road rash");
+    check(std::abs(view.tally.scraped - 5.0f) < 1e-3f && view.tally.scrape_points == static_cast<int>(5.0f * points_per_scraped_metre + 0.5f), "5 m of road rash");
     check(view.injuries[skater_body::index(Bone::hips)] == Injury::hit, "it bruises and shows");
-    check(view.tally.score == 500 + view.tally.time_points && view.tally.impacts == 0, "it scores without a hit");
+    check(view.tally.score == view.tally.scrape_points + view.tally.time_points && view.tally.impacts == 0, "it scores without a hit");
 
     // The whole body slides as one: the road rash is how far it went, not the bodies' sum.
     Tracker body;
@@ -472,7 +477,7 @@ int main() {
         hard_hits_break_and_light_ones_bruise();
         the_board_and_bad_values_are_ignored();
         a_bail_lasts_until_the_skater_gets_up();
-        the_bail_rests_while_the_body_lies_still();
+        a_rest_ends_the_counting();
         a_ragdoll_in_the_air_starts_the_bail();
         a_stumble_without_a_ragdoll_ends();
         an_unknown_skater_state_ends_nothing();

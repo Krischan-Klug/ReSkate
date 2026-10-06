@@ -14,8 +14,7 @@
 // A bail follows the skater, not a clock:
 //   riding  → bailing     a wipeout, or the ragdoll beginning (a fall from height ragdolls in the
 //                         air, before the wipeout of its impact)
-//   bailing → down        the body comes to rest: its time and its points stop
-//   down    → bailing     the body is moving again (thrown, hit by a car): they go on
+//   bailing → down        the body has come to rest: the bail's time and points are final
 //   bailing, down → getting up   the ragdoll ends (the skater stands up), or the skater is gone
 //                         (a respawn, a teleport); the bail is over and fades out
 // Measured on 2026-10-06: the ragdoll begins with the wipeout or in the flight before it, and
@@ -47,11 +46,12 @@ inline constexpr float hit_speed = 4.0f;
 inline constexpr float broken_speed = 8.0f;
 // A wipeout whose ragdoll does not begin within this long was a stumble: its bail ends.
 inline constexpr std::uint64_t ragdoll_wait_ms = 500;
-// The body has come to rest once it moves slower than still_speed for rest_ms, and moves again
-// above moving_speed. Measured on 2026-10-07: a body lying moves at 0.0 to 0.3 m/s (a skater
-// standing 0.0 to 0.1), a tumbling or sliding one at 2 and more.
-inline constexpr float still_speed = 0.5f, moving_speed = 1.5f;
-inline constexpr std::uint64_t rest_ms = 500;
+// The body has come to rest once it moves slower than still_speed for rest_ms: from then on
+// nothing counts. Measured on 2026-10-07: a body lying moves at 0.0 to 0.3 m/s (a skater standing
+// 0.0 to 0.1), a tumbling or sliding one at 2 and more. A rest is final: getting up starts inside
+// the ragdoll (its animated part), moving the body fast again before the ragdoll ends.
+inline constexpr float still_speed = 0.5f;
+inline constexpr std::uint64_t rest_ms = 750;
 inline constexpr std::uint64_t fade_ms = 800;  // the skeleton and the card fade out as the skater gets up
 inline constexpr std::uint64_t flash_ms = 350; // a fresh hit flashes this long
 // A bone's contact lasts several physics steps: hits of one bone closer together than
@@ -73,7 +73,7 @@ inline constexpr std::uint64_t wipeout_after_impact_ms = 250;
 inline constexpr float hit_reference_speed = 5.0f;
 inline constexpr float points_per_reference_hit = 100.0f;
 inline constexpr float hit_points_exponent = 1.5f;
-inline constexpr int points_per_break = 500;
+inline constexpr int points_per_break = 1500;
 // A hit to the head (the upper neck it rides on, Bone::neck1) counts double; one from a
 // vehicle half again. Both together count 2.5 times.
 inline constexpr float head_multiplier = 2.0f;
@@ -82,9 +82,9 @@ inline constexpr float vehicle_multiplier = 1.5f;
 // (metres per second along the surface) scrapes. A long slide on 2026-10-06 slid the body at 3
 // to 10 m/s for seconds without a single hit. The skater's road rash is how far it slid: in
 // each step, how fast its scraping bodies slid on average, not their sum (a dozen bodies on the
-// ground at once would make one metre a dozen). A metre scores what a 5 m/s bruise does.
+// ground at once would make one metre a dozen). A metre scores what four 5 m/s bruises do.
 inline constexpr float scrape_speed = 1.5f;
-inline constexpr float points_per_scraped_metre = 100.0f;
+inline constexpr float points_per_scraped_metre = 400.0f;
 inline constexpr float bruising_scrape = 1.0f; // metres one bone slid: it shows as bruised
 // The rest of the bail scores as skate. 3's Hall of Meat did, each stat its own points: its time
 // (falling and sliding, not resting), its airtime, how far the body fell (every metre it went down,
@@ -215,8 +215,7 @@ private:
     bool hurt_{};      // a bone was hit at least at hit_speed, or scraped bruised, this bail
     std::uint64_t started_{}, ended_{}, stepped_{};
     std::uint64_t still_since_{}; // bailing: when the body last went slower than still_speed; 0 while faster
-    std::uint64_t rested_at_{};   // down: when the body came to rest
-    std::uint64_t rested_ms_{};   // the rests before the current one
+    std::uint64_t rested_at_{};   // down: when the body came to rest, and the bail's time stopped
     std::uint64_t flight_ms_{};  // while riding: the last flight, which a bail takes over
     float flight_fallen_{};      // and how far it went down
     std::uint64_t landed_{};     // when it touched down; 0 while in the air
