@@ -3,10 +3,9 @@
 #include "Extension/UI/Overlay/overlay.h"
 #include <string_view>
 
-// Hall of Meat, as in skate. 3: when the local skater bails, their skeleton shows over the
-// world, each bone yellow where a hit bruised it and red where one broke it, with the bail's
-// Meat counting up while the body tumbles and its card once it lies; both fade out as the
-// skater gets up. The hits and the road rash come from the skater body (local_skater_body.h)
+// Hall of Meat, as in skate. 3: when the local skater bails, the bones it hurt show over the
+// world, yellow where a hit bruised one and red where one broke it, with the bail's card, its
+// Meat counting up; both fade out as the skater gets up. The hits and the road rash come from the skater body (local_skater_body.h)
 // and the ragdoll from the skater state (local_skater_state.h), each physics step as it
 // happens; the skeleton is skate.'s own skeleton mesh (skeleton_mesh.h) posed as the renderer
 // draws the skater (local_skater_render.h). hall_of_meat_model.h follows the bail, how badly

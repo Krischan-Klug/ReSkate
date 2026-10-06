@@ -340,9 +340,9 @@ struct SkeletonFrame {
     std::shared_ptr<const std::vector<std::uint32_t>> triangles; // vertex indices, three a triangle
     std::shared_ptr<const std::vector<std::uint8_t>> parts;      // each vertex's body (skater_body.h)
 };
-// Hall of Meat: the local skater's skeleton over the world from their bail until they get up,
-// each body coloured by how hard it was hit; a Meat counter while the body tumbles, and its
-// card once it lies. Empty parts draw nothing.
+// Hall of Meat: from the local skater's bail until they get up, the bones it hurt over the world,
+// each coloured by how hard it was hit, and the bail's card with its Meat as it adds up. Empty
+// parts draw nothing.
 enum class MeatInjury : std::uint8_t { none, hit, broken };
 struct MeatSkeleton {
     SkeletonFrame frame;
@@ -351,8 +351,7 @@ struct MeatSkeleton {
     std::array<float, skater_body::count> flashes{};       // 1 the moment it is hit, falling to 0
 };
 struct MeatTally {
-    bool live{};   // the body still tumbles: the counter shows
-    float card{};  // once it lies, the card's opacity, fading as the skater gets up (0 = no card)
+    float card{};  // the card's opacity: 1 through the bail, fading as the skater gets up (0 = no card)
     int score{};   // the Meat
     int damage{};
     int impacts{};

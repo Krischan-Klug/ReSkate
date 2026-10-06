@@ -30,6 +30,7 @@
 #include <deque>
 #include <mutex>
 #include <map>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -277,12 +278,14 @@ void draw_nametags();
 bool hall_of_meat_pending();
 void draw_hall_of_meat();
 // skate.'s skeleton mesh as an x-ray over the world (skeleton_overlay.cpp), for any feature: each
-// body in its paint, an opaque colour, from an x-ray's faint middle (solid 0) to solid (1).
+// body in its paint, an opaque colour, from an x-ray's faint middle (solid 0) to solid (1). A body
+// without a paint is not drawn; where it meets a painted one, the painted one fades out.
 struct SkeletonPaint {
     ImU32 colour{};
     float solid{};
 };
-void draw_skeleton(const SkeletonFrame& skeleton, const std::array<SkeletonPaint, skater_body::count>& paints, float alpha);
+using SkeletonPaints = std::array<std::optional<SkeletonPaint>, skater_body::count>;
+void draw_skeleton(const SkeletonFrame& skeleton, const SkeletonPaints& paints, float alpha);
 // The debug panel (debug_panel_overlay.cpp): polled every presented frame.
 bool debug_panel_pending();
 void draw_debug_panel();

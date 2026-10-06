@@ -12,12 +12,10 @@
 // read by the overlay and the debug panel. No game access, no locking: the caller owns both.
 //
 // A bail follows the skater, not a clock:
-//   riding     → falling     a wipeout, or the ragdoll beginning (a fall from height ragdolls in
-//                            the air, before the wipeout of its impact)
-//   falling    → down        the body lies still: no hits, no sliding, not in the air
-//   down       → falling     the body is thrown again: a hit, or in the air
-//   falling, down → getting up   the ragdoll ends (the skater stands up), or the skater is gone
-//                            (a respawn, a teleport); the bail is over and fades out
+//   riding  → bailing     a wipeout, or the ragdoll beginning (a fall from height ragdolls in the
+//                         air, before the wipeout of its impact)
+//   bailing → getting up  the ragdoll ends (the skater stands up), or the skater is gone (a
+//                         respawn, a teleport); the bail is over and fades out
 // Measured on 2026-10-06: the ragdoll begins with the wipeout or in the flight before it, and
 // ends exactly once, when the skater stands up on foot; skate. may put them back on the board
 // a moment later. The bail shows only once it has hurt a bone: a fall that leaves the skater
@@ -42,11 +40,6 @@ enum class Injury : std::uint8_t { none, hit, broken };
 // hard landing hits the legs at 8 to 10, a drop from height everything at 13 to 35.
 inline constexpr float hit_speed = 4.0f;
 inline constexpr float broken_speed = 8.0f;
-// A body still tumbling keeps hitting things at least this hard (the feet aside), slides
-// along, or is in the air. Once none of it happened for settle_ms the body lies: the counter
-// becomes the card.
-inline constexpr float tumbling_speed = 1.0f;
-inline constexpr std::uint64_t settle_ms = 750;
 // A wipeout whose ragdoll does not begin within this long was a stumble: its bail ends.
 inline constexpr std::uint64_t ragdoll_wait_ms = 500;
 inline constexpr std::uint64_t fade_ms = 800;  // the skeleton and the card fade out as the skater gets up
@@ -133,14 +126,13 @@ constexpr Standing standing(int best, int score) noexcept {
     return score > best ? Standing{score, true} : Standing{best, false};
 }
 
-enum class Phase : std::uint8_t { riding, falling, down, getting_up };
+enum class Phase : std::uint8_t { riding, bailing, getting_up };
 // What the overlay draws at one moment: riding (nothing) until the bail hurts a bone.
 struct View {
     Phase phase{};
-    float alpha{}; // the skeleton: 1 while the skater is down, fading to 0 as they get up
+    float alpha{}; // the skeleton's and the card's: 1 through the bail, fading to 0 as the skater gets up
     std::array<Injury, skater_body::count> injuries{};
     std::array<float, skater_body::count> flashes{}; // 1 at a fresh hit, falling to 0
-    float card{};  // the card's opacity once the body lies, and as it fades (0 while falling: the counter)
     Tally tally;
 };
 // The bail at one moment, for the debug panel, whether it hurt a bone or not.
@@ -186,17 +178,16 @@ private:
         Lead lead;
     };
     void begin(std::uint64_t now) noexcept;
-    // A hit at `at`; true when it was hard enough to hurt.
-    bool hit(std::size_t bone, float speed, bool vehicle, std::uint64_t at) noexcept;
+    void hit(std::size_t bone, float speed, bool vehicle, std::uint64_t at) noexcept;
     bool end(std::uint64_t now, Summary* ended) noexcept;
     Phase phase(std::uint64_t now) const noexcept;
     Tally tally() const noexcept;
     Injury injury_of(const BoneState& bone) const noexcept;
 
-    Phase phase_{};    // riding, falling or down; getting_up is the fade after a bail's end
+    Phase phase_{};    // riding or bailing; getting_up is the fade after a bail's end
     bool ragdolled_{}; // the bail's ragdoll has begun
     bool hurt_{};      // a bone was hit at least at hit_speed, or scraped bruised, this bail
-    std::uint64_t started_{}, tumbled_{}, ended_{}, stepped_{};
+    std::uint64_t started_{}, ended_{}, stepped_{};
     std::uint64_t flight_ms_{};  // while riding: the last flight, which a bail takes over
     std::uint64_t landed_{};     // when it touched down; 0 while in the air
     std::uint64_t airtime_ms_{};

@@ -201,31 +201,27 @@ overlay::MeatFrame frame() {
     Standing against; // the card's: the bail against the map's best before it
     AcquireSRWLockExclusive(&s.lock);
     view = s.tracker.view(now);
-    if (view.phase == Phase::down) against = s.best_known ? standing(s.best, view.tally.score) : Standing{};
+    if (view.phase == Phase::bailing) against = s.best_known ? standing(s.best, view.tally.score) : Standing{};
     else if (view.phase == Phase::getting_up) against = s.standing; // the best already counts this bail
     ReleaseSRWLockExclusive(&s.lock);
+    if (view.phase == Phase::riding) return {};
 
     overlay::MeatFrame result;
     auto& tally = result.tally;
-    tally.live = view.phase == Phase::falling;
-    tally.card = view.card;
-    if (tally.live || tally.card > 0) {
-        tally.score = view.tally.score;
-        tally.damage = view.tally.damage;
-        tally.impacts = view.tally.impacts;
-        tally.broken = view.tally.broken;
-        tally.road_rash = view.tally.scraped;
-        tally.airtime = view.tally.airtime;
-        if (!tally.live) {
-            tally.best = against.best;
-            tally.new_best = against.new_best;
-        }
-    }
+    tally.card = view.alpha;
+    tally.score = view.tally.score;
+    tally.damage = view.tally.damage;
+    tally.impacts = view.tally.impacts;
+    tally.broken = view.tally.broken;
+    tally.road_rash = view.tally.scraped;
+    tally.airtime = view.tally.airtime;
+    tally.best = against.best;
+    tally.new_best = against.new_best;
     // The skeleton as the renderer drew the skater in the latest picture, seen by its camera.
     const auto mesh = skater_skeleton::mesh();
     skater_render::Picture picture;
     skater_skeleton::Posed posed;
-    if (!mesh || view.phase == Phase::riding || !skater_render::latest(picture) || !skater_skeleton::pose(*mesh, picture.skin, posed))
+    if (!mesh || !skater_render::latest(picture) || !skater_skeleton::pose(*mesh, picture.skin, posed))
         return result;
     auto& skeleton = result.skeleton;
     skeleton.frame.camera = picture.camera;

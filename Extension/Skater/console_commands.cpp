@@ -54,7 +54,7 @@ void register_movement_commands(Commands &registry) {
         };
         registry.add(std::move(entry));
     }
-    auto meat = variable("hallofmeat", "Hall of Meat: the skater's skeleton when they bail, bruised bones yellow and broken ones red, and the bail's Meat score",
+    auto meat = variable("hallofmeat", "Hall of Meat: the bones the skater hurt when they bail, bruised ones yellow and broken ones red, and the bail's Meat score",
         Group::movement, argument("on|off", Type::boolean));
     meat.execution = Execution::local;
     meat.inspect = [](const Model &) { return boolean_state(true, hall_of_meat::enabled()); };

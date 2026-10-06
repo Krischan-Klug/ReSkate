@@ -118,7 +118,7 @@ void movement_controls(SkateMenu& menu, const Model& model, const CallbacksV3& c
 
     begin_card(menu, "hall-of-meat", "HALL OF MEAT");
     bool meat = hall_of_meat_enabled();
-    if (toggle_row(menu, "Hall of Meat", "Show your skeleton when you bail, bruised bones yellow and broken ones red, and score the bail's Meat.",
+    if (toggle_row(menu, "Hall of Meat", "Show the bones you hurt when you bail, bruised ones yellow and broken ones red, and score the bail's Meat.",
             meat, hall_of_meat_available() && callbacks.queue_console_command))
         send_console(menu, callbacks, meat ? "hallofmeat on" : "hallofmeat off");
     if (!hall_of_meat_available()) note("Unavailable for this game build; see the log.");

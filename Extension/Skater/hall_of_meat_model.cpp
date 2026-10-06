@@ -40,16 +40,13 @@ bool Tracker::step(std::uint64_t now, const Step& step, Summary* ended) noexcept
     }
     ragdolled_ = ragdolled_ || ragdoll;
 
-    // Whether the body still tumbles, and whether something hit it hard.
-    bool tumbling = step.wipeout || step.airborne, struck = false;
     const float step_seconds = static_cast<float>(step_ms) / 1000.0f;
     float sliding{}; // the scraping bodies' slides, summed
     int scraping{};
     for (std::size_t index = 1; index < skater_body::count; ++index) {
         const auto& contact = step.body.bodies[index];
         const float speed = speed_of(contact.impact);
-        if (speed >= tumbling_speed && !is_foot(index)) tumbling = true;
-        if (speed > 0 && hit(index, speed, contact.hit.vehicle, now)) struck = true;
+        if (speed > 0) hit(index, speed, contact.hit.vehicle, now);
         const float slide = game::length(contact.slide);
         if (!contact.touching || is_foot(index) || !scrapes(contact.hit) || !std::isfinite(slide) || slide < scrape_speed)
             continue;
@@ -59,18 +56,10 @@ bool Tracker::step(std::uint64_t now, const Step& step, Summary* ended) noexcept
         sliding += slide;
         ++scraping;
     }
-    if (scraping) {
-        scraped_ += sliding / static_cast<float>(scraping) * step_seconds;
-        tumbling = true;
-    }
-    if (tumbling) tumbled_ = now;
-
+    if (scraping) scraped_ += sliding / static_cast<float>(scraping) * step_seconds;
     // The skater stood up, or never went down.
     const bool stood_up = ragdolled_ ? step.ragdoll.has_value() && !*step.ragdoll : elapsed(now, started_) >= ragdoll_wait_ms;
-    if (stood_up) return end(now, ended);
-    if (phase_ == Phase::falling && elapsed(now, tumbled_) >= settle_ms) phase_ = Phase::down;
-    else if (phase_ == Phase::down && (struck || step.airborne)) phase_ = Phase::falling;
-    return false;
+    return stood_up && end(now, ended);
 }
 
 bool Tracker::lose(std::uint64_t now, Summary* ended) noexcept {
@@ -85,8 +74,8 @@ void Tracker::begin(std::uint64_t now) noexcept {
     const auto flight = flight_ms_;
     const auto before = bones_;
     *this = {};
-    phase_ = Phase::falling;
-    started_ = tumbled_ = stepped_ = now;
+    phase_ = Phase::bailing;
+    started_ = stepped_ = now;
     airtime_ms_ = flight; // this step's share is in it
     for (std::size_t index = 1; index < skater_body::count; ++index) {
         const auto& lead = before[index].lead;
@@ -95,10 +84,10 @@ void Tracker::begin(std::uint64_t now) noexcept {
 }
 
 // A hit of one bone at `at`: a new impact, or the harder step of the contact it belongs to.
-bool Tracker::hit(std::size_t index, float speed, bool vehicle, std::uint64_t at) noexcept {
+void Tracker::hit(std::size_t index, float speed, bool vehicle, std::uint64_t at) noexcept {
     auto& bone = bones_[index];
     bone.peak = std::max(bone.peak, speed);
-    if (speed < hit_speed) return false;
+    if (speed < hit_speed) return;
     hurt_ = true;
     if (bone.hit_at && elapsed(at, bone.hit_at) <= impact_gap_ms) {
         auto& impact = impacts_[bone.impact];
@@ -110,7 +99,6 @@ bool Tracker::hit(std::size_t index, float speed, bool vehicle, std::uint64_t at
         impacts_[impact_count_++] = {index, speed, vehicle};
     }
     bone.hit_at = at;
-    return true;
 }
 
 bool Tracker::end(std::uint64_t now, Summary* ended) noexcept {
@@ -164,7 +152,6 @@ View Tracker::view(std::uint64_t now) const noexcept {
     view.phase = phase;
     view.alpha = phase == Phase::getting_up
         ? 1.0f - static_cast<float>(elapsed(now, ended_)) / static_cast<float>(fade_ms) : 1.0f;
-    view.card = phase == Phase::falling ? 0.0f : view.alpha;
     view.tally = tally();
     for (std::size_t index = 0; index < skater_body::count; ++index) {
         const auto& bone = bones_[index];

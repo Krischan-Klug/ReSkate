@@ -20,10 +20,11 @@ ImU32 lit(ImU32 colour, float light, float alpha) {
 }
 }
 
-// Every triangle drawn back to front, each vertex in its body's paint and lit by how it faces the
-// camera: an outline opaque and a middle faint (unless the paint is solid), so the bones read
-// through each other and against the world.
-void draw_skeleton(const SkeletonFrame& skeleton, const std::array<SkeletonPaint, skater_body::count>& paints, float alpha) {
+// Every triangle of a painted body drawn back to front, each vertex in its body's paint and lit by
+// how it faces the camera: an outline opaque and a middle faint (unless the paint is solid), so the
+// bones read through each other and against the world. A vertex of an unpainted body is clear, so
+// a triangle reaching into one fades out.
+void draw_skeleton(const SkeletonFrame& skeleton, const SkeletonPaints& paints, float alpha) {
     const auto& positions = skeleton.positions;
     const auto count = positions.size();
     if (!count || count > 0xffff || !skeleton.triangles || !skeleton.parts || skeleton.parts->size() != count ||
@@ -37,7 +38,7 @@ void draw_skeleton(const SkeletonFrame& skeleton, const std::array<SkeletonPaint
     // Render thread only: reused frame to frame.
     static std::vector<ImVec2> at;
     static std::vector<float> depth;
-    static std::vector<ImU32> colour;
+    static std::vector<ImU32> colour; // 0 for an unpainted body's vertex
     static std::vector<std::pair<float, std::uint32_t>> order; // a triangle's depth, its first index
     at.resize(count);
     depth.resize(count);
@@ -52,13 +53,15 @@ void draw_skeleton(const SkeletonFrame& skeleton, const std::array<SkeletonPaint
         const float facing = distance > 1e-4f ? std::abs(dot(skeleton.normals[i], delta)) / distance : 1.0f;
         const auto& paint = paints[std::min<std::size_t>((*skeleton.parts)[i], skater_body::count - 1)];
         const float faint = 0.25f + 0.6f * (1.0f - facing);
-        colour[i] = lit(paint.colour, 0.55f + 0.45f * facing, alpha * (paint.solid + (1.0f - paint.solid) * faint));
+        colour[i] = paint ? lit(paint->colour, 0.55f + 0.45f * facing, alpha * (paint->solid + (1.0f - paint->solid) * faint)) : 0;
     }
     const auto& triangles = *skeleton.triangles;
     order.clear();
     for (std::uint32_t t = 0; t + 2 < triangles.size(); t += 3) {
         const auto a = triangles[t], b = triangles[t + 1], c = triangles[t + 2];
-        if (a >= count || b >= count || c >= count || depth[a] <= 0.1f || depth[b] <= 0.1f || depth[c] <= 0.1f) continue;
+        if (a >= count || b >= count || c >= count || depth[a] <= 0.1f || depth[b] <= 0.1f || depth[c] <= 0.1f ||
+            (!colour[a] && !colour[b] && !colour[c]))
+            continue;
         order.emplace_back(depth[a] + depth[b] + depth[c], t);
     }
     if (order.empty()) return;

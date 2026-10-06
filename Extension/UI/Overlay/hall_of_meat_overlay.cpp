@@ -4,11 +4,11 @@
 #include <cmath>
 #include <format>
 
-// Hall of Meat (Extension/Skater/hall_of_meat.h): the local skater's skeleton over the world
-// from their bail until they get up, a Meat counter while the body tumbles, and the bail's
-// card once it lies. The game side hands over the posed skeleton mesh in world space with the
-// live camera, drawn as the overlay's x-ray (skeleton_overlay.cpp) in each body's injury
-// colour. The counter and card are drawn in skate.'s menu style like the S.K.A.T.E. HUD. All of it on the background draw list, under
+// Hall of Meat (Extension/Skater/hall_of_meat.h): from the local skater's bail until they get
+// up, the bones it hurt over the world and the bail's card, its Meat counting up. The game side
+// hands over the posed skeleton mesh in world space with the live camera, drawn as the overlay's
+// x-ray (skeleton_overlay.cpp): only the hurt bodies, in their injury's colour, as in skate. 3.
+// The card is drawn in skate.'s menu style like the S.K.A.T.E. HUD. All of it on the background draw list, under
 // ReSkate's own menus and chat, taking no input.
 
 namespace dingosdk::overlay {
@@ -30,12 +30,12 @@ bool hall_of_meat_enabled() noexcept {
 namespace dingosdk::overlay::detail {
 namespace {
 namespace theme = dingosdk::skate_theme;
-constexpr ImU32 intact = IM_COL32(236, 230, 214, 255), bruised = IM_COL32(255, 196, 36, 255),
+constexpr ImU32 bruised = IM_COL32(255, 196, 36, 255),
     broken = IM_COL32(232, 32, 32, 255), dark_red = IM_COL32(150, 12, 12, 255), hot = IM_COL32(255, 255, 255, 255);
 
 struct MeatState {
     MeatFrame frame;
-    float shown_score{}; // the counter eases towards the score
+    float shown_score{}; // the card's Meat eases towards the score
     double counted_at{};
 };
 MeatState& meat() {
@@ -54,11 +54,10 @@ ImU32 mix(ImU32 from, ImU32 to, float amount) {
     return IM_COL32(channel(IM_COL32_R_SHIFT), channel(IM_COL32_G_SHIFT), channel(IM_COL32_B_SHIFT),
         channel(IM_COL32_A_SHIFT));
 }
-// Intact bones are bone white, bruised ones yellow, broken ones a slowly pulsing red; a
-// fresh hit flashes white-hot.
+// Bruised bones are yellow, broken ones a slowly pulsing red; a fresh hit flashes white-hot.
 ImU32 bone_colour(MeatInjury injury, float flash, double time) {
-    ImU32 colour = injury == MeatInjury::hit ? bruised : injury == MeatInjury::broken ? broken : intact;
-    if (injury == MeatInjury::broken) colour = mix(dark_red, broken, 0.5f + 0.5f * static_cast<float>(std::sin(time * 6.0)));
+    const ImU32 colour = injury == MeatInjury::broken
+        ? mix(dark_red, broken, 0.5f + 0.5f * static_cast<float>(std::sin(time * 6.0))) : bruised;
     return mix(colour, hot, flash * 0.8f);
 }
 // 12,345
@@ -74,42 +73,19 @@ void shadowed(ImDrawList* draw, ImFont* font, float size, ImVec2 at, ImU32 colou
     draw->AddText(font, size, at, colour, text);
 }
 
-// Each body in its injury's colour: an intact one an x-ray, a hurt one near solid.
+// The hurt bodies, near solid in their injury's colour; the rest are not drawn.
 void draw_meat_skeleton(const MeatSkeleton& value) {
-    std::array<SkeletonPaint, skater_body::count> paints{};
+    SkeletonPaints paints{};
     const double time = ImGui::GetTime();
     for (std::size_t body = 0; body < skater_body::count; ++body)
-        paints[body] = {bone_colour(value.injuries[body], value.flashes[body], time), value.injuries[body] == MeatInjury::none ? 0.0f : 0.6f};
+        if (value.injuries[body] != MeatInjury::none)
+            paints[body] = SkeletonPaint{bone_colour(value.injuries[body], value.flashes[body], time), 0.6f};
     draw_skeleton(value.frame, paints, value.alpha);
 }
 
-// The counter and the card share the top right corner (1080p pixels from its edges): the
-// counter while the body tumbles, the card once it lies.
+// The bail's card in the top right corner (1080p pixels from its edges): its Meat and what made
+// it, as it adds up. The bones it hurt show on the skeleton.
 constexpr float corner_right = 48.0f, corner_top = 96.0f;
-
-// While the body tumbles: MEAT and the score, counting up, on a plate.
-void draw_counter(int score, float k) {
-    auto& s = state();
-    auto* heading = s.menu.heading ? s.menu.heading : ImGui::GetFont();
-    auto* draw = ImGui::GetBackgroundDrawList();
-    const float label_size = 16.0f * k, number_size = 28.0f * k;
-    const auto label_extent = heading->CalcTextSizeA(label_size, FLT_MAX, 0.0f, "MEAT");
-    const auto number = grouped(score);
-    const auto number_extent = heading->CalcTextSizeA(number_size, FLT_MAX, 0.0f, number.c_str());
-    const float pad_x = 18.0f * k, pad_y = 8.0f * k;
-    const float width = std::max(label_extent.x, number_extent.x) + pad_x * 2.0f;
-    const float right = ImGui::GetIO().DisplaySize.x - corner_right * k;
-    const ImVec2 min(right - width, corner_top * k);
-    const ImVec2 max(right, min.y + pad_y * 2.0f + label_extent.y + number_extent.y);
-    theme::rough_rect(draw, min, max, with_alpha(theme::tile, 0.9f), 93u, k);
-    draw->AddRectFilled(min, ImVec2(min.x + 5.0f * k, max.y), broken);
-    shadowed(draw, heading, label_size, ImVec2(max.x - pad_x - label_extent.x, min.y + pad_y), theme::grey_text, "MEAT");
-    shadowed(draw, heading, number_size, ImVec2(max.x - pad_x - number_extent.x, min.y + pad_y + label_extent.y),
-             theme::white, number.c_str());
-}
-
-// Once the body lies: the bail's card, with the score and what made it. The bones it hurt show
-// on the skeleton.
 void draw_card(const MeatTally& tally, int score, float k) {
     auto& s = state();
     auto* title = s.menu.title ? s.menu.title : ImGui::GetFont();
@@ -159,9 +135,8 @@ bool hall_of_meat_pending() {
     if (const auto feed = frame_feed.load()) {
         try { m.frame = feed(); } catch (...) { m.frame = {}; }
     }
-    const auto& tally = m.frame.tally;
-    if (!tally.live && tally.card <= 0) m.shown_score = 0;
-    return !m.frame.skeleton.frame.positions.empty() || tally.live || tally.card > 0;
+    if (m.frame.tally.card <= 0) m.shown_score = 0;
+    return !m.frame.skeleton.frame.positions.empty() || m.frame.tally.card > 0;
 }
 
 void draw_hall_of_meat() {
@@ -171,15 +146,13 @@ void draw_hall_of_meat() {
     const float k = display.y / 1080.0f;
     draw_meat_skeleton(m.frame.skeleton);
     const auto& tally = m.frame.tally;
-    if (!tally.live && tally.card <= 0) return;
-    // The counter catches up with the score in about a quarter of a second.
+    if (tally.card <= 0) return;
+    // The Meat catches up with the score in about a quarter of a second.
     const double now = ImGui::GetTime();
     const float step = static_cast<float>(std::clamp(now - m.counted_at, 0.0, 0.1));
     m.counted_at = now;
     m.shown_score += (static_cast<float>(tally.score) - m.shown_score) * (1.0f - std::exp(-step * 12.0f));
     if (std::abs(static_cast<float>(tally.score) - m.shown_score) < 1.0f) m.shown_score = static_cast<float>(tally.score);
-    const int shown = static_cast<int>(m.shown_score + 0.5f);
-    if (tally.live) draw_counter(shown, k);
-    else draw_card(tally, shown, k);
+    draw_card(tally, static_cast<int>(m.shown_score + 0.5f), k);
 }
 } // namespace dingosdk::overlay::detail
