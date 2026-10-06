@@ -64,6 +64,12 @@ Step slide(Bone bone, float speed, bool wipeout = false) {
     contact.hit.world = true;
     return step;
 }
+// A ragdoll step at `speed`, touching nothing.
+Step moving(float speed) {
+    auto step = lying();
+    step.speed = speed;
+    return step;
+}
 // Steps `step` from `now` on, every 16 ms, for `ms`; returns the time after the last.
 std::uint64_t keep(Tracker& tracker, std::uint64_t now, std::uint64_t ms, const Step& step) {
     for (const auto until = now + ms; now < until; now += 16) tracker.step(now, step);
@@ -158,6 +164,36 @@ void a_bail_lasts_until_the_skater_gets_up() {
     // The next wipeout starts afresh.
     tracker.step(now + fade_ms + 16, wipeout());
     check(tracker.view(now + fade_ms + 16).injuries[skater_body::index(Bone::hips)] == Injury::none, "a new bail starts clean");
+}
+
+void the_bail_rests_while_the_body_lies_still() {
+    Tracker tracker;
+    tracker.step(t0, hit(Bone::hips, 7.0f, true));
+    auto now = keep(tracker, t0 + 16, 1000, moving(4.0f));
+    const auto went_still = now;
+    now = keep(tracker, now, rest_ms - 16, moving(0.2f));
+    check(tracker.report(now - 16).phase == Phase::bailing, "not resting yet");
+    now = keep(tracker, now, 32, moving(0.1f));
+    check(tracker.report(now).phase == Phase::down, "a still body rests");
+    check(tracker.view(now).bail_ms == went_still - t0, "its time stopped when it went still");
+    auto twitch = hit(Bone::left_hand, 6.0f);
+    twitch.speed = 0.3f; // a bone twitches, the body barely moves
+    tracker.step(now, twitch);
+    check(tracker.report(now).phase == Phase::down && tracker.view(now).tally.impacts == 1, "a twitch at rest scores nothing");
+    const auto later = now + 3000;
+    check(tracker.view(later).bail_ms == went_still - t0, "however long it lies");
+    auto thrown = hit(Bone::neck1, 9.0f);
+    thrown.speed = 5.0f; // a car throws the body again
+    tracker.step(later, thrown);
+    check(tracker.report(later).phase == Phase::bailing && tracker.view(later).tally.impacts == 2,
+        "moving again, the bail goes on");
+    check(tracker.view(later + 1000).bail_ms == went_still - t0 + 1000, "and so does its time");
+    Summary summary;
+    tracker.step(later + 1000, standing_up(), &summary);
+    check(summary.duration_ms == went_still - t0 + 1000, "the bail's time leaves its rests out");
+    Tracker unknown;
+    unknown.step(t0, hit(Bone::hips, 7.0f, true));
+    check(unknown.report(keep(unknown, t0 + 16, 2000, lying())).phase == Phase::bailing, "an unknown speed never rests");
 }
 
 void a_ragdoll_in_the_air_starts_the_bail() {
@@ -392,6 +428,7 @@ int main() {
         hard_hits_break_and_light_ones_bruise();
         the_board_and_bad_values_are_ignored();
         a_bail_lasts_until_the_skater_gets_up();
+        the_bail_rests_while_the_body_lies_still();
         a_ragdoll_in_the_air_starts_the_bail();
         a_stumble_without_a_ragdoll_ends();
         an_unknown_skater_state_ends_nothing();

@@ -22,6 +22,7 @@ bool Tracker::step(std::uint64_t now, const Step& step, Summary* ended) noexcept
     if (step.airborne) landed_ = 0;
     else if (!landed_) landed_ = now;
     const bool ragdoll = step.ragdoll.value_or(false);
+    bool began{};
     if (phase_ == Phase::riding) {
         if (step.airborne) flight_ms_ += flown;
         else if (elapsed(now, landed_) > wipeout_after_impact_ms) flight_ms_ = 0; // landed, and stayed up
@@ -34,12 +35,40 @@ bool Tracker::step(std::uint64_t now, const Step& step, Summary* ended) noexcept
             lead = {speed, contact.hit.vehicle, now};
         }
         if (!step.wipeout && !ragdoll) return false;
-        begin(now);
-    } else {
-        airtime_ms_ += flown;
+        begin(now); // the flight it came from holds this step's airtime
+        began = true;
     }
     ragdolled_ = ragdolled_ || ragdoll;
+    rest(now, step.speed);
+    if (phase_ == Phase::bailing) {
+        if (!began) airtime_ms_ += flown;
+        count(now, step, step_ms);
+    }
+    // The skater stood up, or never went down.
+    const bool stood_up = ragdolled_ ? step.ragdoll.has_value() && !*step.ragdoll : elapsed(now, started_) >= ragdoll_wait_ms;
+    return stood_up && end(now, ended);
+}
 
+// Whether the body rests, by how fast it moves: its time and its points stop while it does.
+void Tracker::rest(std::uint64_t now, std::optional<float> speed) noexcept {
+    if (!speed) return;
+    if (phase_ == Phase::down) {
+        if (*speed <= moving_speed) return;
+        rested_ms_ += elapsed(now, rested_at_);
+        rested_at_ = still_since_ = 0;
+        phase_ = Phase::bailing;
+    } else if (*speed >= still_speed) {
+        still_since_ = 0;
+    } else if (!still_since_) {
+        still_since_ = now;
+    } else if (elapsed(now, still_since_) >= rest_ms) {
+        phase_ = Phase::down;
+        rested_at_ = still_since_; // it has rested since it went still
+    }
+}
+
+// What each body hit and how far it slid in one step of the bail.
+void Tracker::count(std::uint64_t now, const Step& step, std::uint64_t step_ms) noexcept {
     const float step_seconds = static_cast<float>(step_ms) / 1000.0f;
     float sliding{}; // the scraping bodies' slides, summed
     int scraping{};
@@ -57,9 +86,6 @@ bool Tracker::step(std::uint64_t now, const Step& step, Summary* ended) noexcept
         ++scraping;
     }
     if (scraping) scraped_ += sliding / static_cast<float>(scraping) * step_seconds;
-    // The skater stood up, or never went down.
-    const bool stood_up = ragdolled_ ? step.ragdoll.has_value() && !*step.ragdoll : elapsed(now, started_) >= ragdoll_wait_ms;
-    return stood_up && end(now, ended);
 }
 
 bool Tracker::lose(std::uint64_t now, Summary* ended) noexcept {
@@ -105,7 +131,7 @@ bool Tracker::end(std::uint64_t now, Summary* ended) noexcept {
     phase_ = Phase::riding;
     ended_ = now;
     if (ended) {
-        ended->duration_ms = elapsed(now, started_);
+        ended->duration_ms = bail_ms(now);
         ended->shown = hurt_;
         for (std::size_t index = 0; index < skater_body::count; ++index) {
             ended->peaks[index] = bones_[index].peak;
@@ -117,7 +143,10 @@ bool Tracker::end(std::uint64_t now, Summary* ended) noexcept {
 }
 
 std::uint64_t Tracker::bail_ms(std::uint64_t now) const noexcept {
-    return phase_ != Phase::riding ? elapsed(now, started_) : elapsed(ended_, started_);
+    const auto until = phase_ == Phase::riding ? ended_ : now;
+    const auto lasted = elapsed(until, started_);
+    const auto rested = rested_ms_ + (rested_at_ ? elapsed(until, rested_at_) : 0);
+    return lasted - std::min(lasted, rested);
 }
 
 Phase Tracker::phase(std::uint64_t now) const noexcept {

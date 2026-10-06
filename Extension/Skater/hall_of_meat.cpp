@@ -59,6 +59,7 @@ void observe_step(const skater_body::Step& body_step) noexcept {
     if (skater_state::read(body_step.skater, skater)) {
         step.airborne = skater_state::airborne(skater);
         if (skater_state::mode_known(skater)) step.ragdoll = skater_state::mode(skater) == skater_state::Mode::ragdoll;
+        if (skater.motion_known) step.speed = skater_state::speed(skater);
     }
     skater_body::read_contacts(body_step.skater, step.body);
     Summary ended;
@@ -203,7 +204,8 @@ overlay::MeatFrame frame() {
     Standing against; // the card's: the bail against the map's best before it
     AcquireSRWLockExclusive(&s.lock);
     view = s.tracker.view(now);
-    if (view.phase == Phase::bailing) against = s.best_known ? standing(s.best, view.tally.score) : Standing{};
+    if (view.phase == Phase::bailing || view.phase == Phase::down)
+        against = s.best_known ? standing(s.best, view.tally.score) : Standing{};
     else if (view.phase == Phase::getting_up) against = s.standing; // the best already counts this bail
     ReleaseSRWLockExclusive(&s.lock);
     if (view.phase == Phase::riding) return {};

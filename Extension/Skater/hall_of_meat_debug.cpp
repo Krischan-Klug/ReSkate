@@ -11,6 +11,7 @@ std::string seconds(std::uint64_t ms) { return std::format("{:.1f} s", static_ca
 std::string_view phase_name(Phase phase) {
     switch (phase) {
     case Phase::bailing: return "bailing";
+    case Phase::down: return "down";
     case Phase::getting_up: return "getting up";
     case Phase::riding: break;
     }

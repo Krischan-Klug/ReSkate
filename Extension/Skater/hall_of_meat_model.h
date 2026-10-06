@@ -14,8 +14,10 @@
 // A bail follows the skater, not a clock:
 //   riding  → bailing     a wipeout, or the ragdoll beginning (a fall from height ragdolls in the
 //                         air, before the wipeout of its impact)
-//   bailing → getting up  the ragdoll ends (the skater stands up), or the skater is gone (a
-//                         respawn, a teleport); the bail is over and fades out
+//   bailing → down        the body comes to rest: its time and its points stop
+//   down    → bailing     the body is moving again (thrown, hit by a car): they go on
+//   bailing, down → getting up   the ragdoll ends (the skater stands up), or the skater is gone
+//                         (a respawn, a teleport); the bail is over and fades out
 // Measured on 2026-10-06: the ragdoll begins with the wipeout or in the flight before it, and
 // ends exactly once, when the skater stands up on foot; skate. may put them back on the board
 // a moment later. The bail shows only once it has hurt a bone: a fall that leaves the skater
@@ -30,6 +32,9 @@ struct Step {
     // The body is a ragdoll (skater_state.h Mode::ragdoll); empty when the skater state could not
     // be read: such a step neither starts nor ends a bail by it.
     std::optional<bool> ragdoll;
+    // How fast the skater moves (skater_state.h speed), metres per second; empty when unknown:
+    // such a step neither rests nor stirs the body.
+    std::optional<float> speed;
     skater_body::Contacts body; // what each body touched in the step
 };
 
@@ -42,6 +47,11 @@ inline constexpr float hit_speed = 4.0f;
 inline constexpr float broken_speed = 8.0f;
 // A wipeout whose ragdoll does not begin within this long was a stumble: its bail ends.
 inline constexpr std::uint64_t ragdoll_wait_ms = 500;
+// The body has come to rest once it moves slower than still_speed for rest_ms, and moves again
+// above moving_speed. Measured on 2026-10-07: a body lying moves at 0.0 to 0.3 m/s (a skater
+// standing 0.0 to 0.1), a tumbling or sliding one at 2 and more.
+inline constexpr float still_speed = 0.5f, moving_speed = 1.5f;
+inline constexpr std::uint64_t rest_ms = 500;
 inline constexpr std::uint64_t fade_ms = 800;  // the skeleton and the card fade out as the skater gets up
 inline constexpr std::uint64_t flash_ms = 350; // a fresh hit flashes this long
 // A bone's contact lasts several physics steps: hits of one bone closer together than
@@ -127,12 +137,12 @@ constexpr Standing standing(int best, int score) noexcept {
     return score > best ? Standing{score, true} : Standing{best, false};
 }
 
-enum class Phase : std::uint8_t { riding, bailing, getting_up };
+enum class Phase : std::uint8_t { riding, bailing, down, getting_up };
 // What the overlay draws at one moment: riding (nothing) until the bail hurts a bone.
 struct View {
     Phase phase{};
     float alpha{}; // the skeleton's and the card's: 1 through the bail, fading to 0 as the skater gets up
-    std::uint64_t bail_ms{}; // how long the bail has lasted, or lasted
+    std::uint64_t bail_ms{}; // how long the body has been falling and sliding: not while it rests
     std::array<Injury, skater_body::count> injuries{};
     std::array<float, skater_body::count> flashes{}; // 1 at a fresh hit, falling to 0
     Tally tally;
@@ -140,14 +150,14 @@ struct View {
 // The bail at one moment, for the debug panel, whether it hurt a bone or not.
 struct Report {
     Phase phase{};
-    std::uint64_t bail_ms{}; // how long the bail has lasted, or lasted
+    std::uint64_t bail_ms{}; // how long the body has been falling and sliding: not while it rests
     Tally tally;
     bool hit{};              // the bail has a hit: last is it
     Impact last;
 };
 // A finished bail, for the log and the map's best.
 struct Summary {
-    std::uint64_t duration_ms{};
+    std::uint64_t duration_ms{}; // falling and sliding, not resting
     bool shown{}; // it hurt a bone, so it showed (and counts for a best)
     std::array<float, skater_body::count> peaks{};   // each body's hardest hit
     std::array<float, skater_body::count> scraped{}; // and how far it slid, each on its own
@@ -180,6 +190,8 @@ private:
         Lead lead;
     };
     void begin(std::uint64_t now) noexcept;
+    void rest(std::uint64_t now, std::optional<float> speed) noexcept;
+    void count(std::uint64_t now, const Step& step, std::uint64_t step_ms) noexcept;
     void hit(std::size_t bone, float speed, bool vehicle, std::uint64_t at) noexcept;
     bool end(std::uint64_t now, Summary* ended) noexcept;
     Phase phase(std::uint64_t now) const noexcept;
@@ -187,10 +199,13 @@ private:
     Tally tally() const noexcept;
     Injury injury_of(const BoneState& bone) const noexcept;
 
-    Phase phase_{};    // riding or bailing; getting_up is the fade after a bail's end
+    Phase phase_{};    // riding, bailing or down; getting_up is the fade after a bail's end
     bool ragdolled_{}; // the bail's ragdoll has begun
     bool hurt_{};      // a bone was hit at least at hit_speed, or scraped bruised, this bail
     std::uint64_t started_{}, ended_{}, stepped_{};
+    std::uint64_t still_since_{}; // bailing: when the body last went slower than still_speed; 0 while faster
+    std::uint64_t rested_at_{};   // down: when the body came to rest
+    std::uint64_t rested_ms_{};   // the rests before the current one
     std::uint64_t flight_ms_{};  // while riding: the last flight, which a bail takes over
     std::uint64_t landed_{};     // when it touched down; 0 while in the air
     std::uint64_t airtime_ms_{};
