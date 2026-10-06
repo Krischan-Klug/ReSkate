@@ -41,6 +41,17 @@ void off_the_board_the_offboard_state_decides() {
     check(!airborne(sliding), "a ragdoll moving down on the ground is not in the air");
 }
 
+void the_speed_follows_the_mode() {
+    auto riding = on_board(false);
+    riding.board_velocity = {3, 0, 4};
+    riding.body_velocity = {1, 0, 0};
+    check(speed(riding) == 5.0f, "on the board: the board's speed");
+    auto bailing = off_board(true, Substate::ragdoll);
+    bailing.board_velocity = {9, 0, 0};
+    bailing.body_velocity = {0, -6, 8};
+    check(speed(bailing) == 10.0f && velocity(bailing)[1] == -6.0f, "off it: the body's");
+}
+
 void an_unreadable_offboard_state_says_nothing() {
     auto unknown = off_board(true, Substate::ragdoll);
     unknown.offboard_known = false;
@@ -55,6 +66,7 @@ int main() {
         the_board_goes_by_the_physics_state();
         off_the_board_the_offboard_state_decides();
         an_unreadable_offboard_state_says_nothing();
+        the_speed_follows_the_mode();
     } catch (const std::exception& error) {
         std::cerr << "FAILED: " << error.what() << '\n';
         return 1;

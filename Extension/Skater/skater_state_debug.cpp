@@ -1,5 +1,6 @@
 #include "skater_state_debug.h"
 #include "local_skater_state.h"
+#include "Engine/Game/UI/display_format.h"
 #include <format>
 #include <string>
 
@@ -8,6 +9,10 @@ namespace {
 using debug_panel::Field;
 
 std::string yes_no(bool value) { return value ? "yes" : "no"; }
+std::string speed_text(const game::Vec3& velocity) {
+    const float speed = game::length(velocity);
+    return std::format("{:.1f} m/s ({:.1f} MPH)", speed, display_format::mph(speed));
+}
 std::string_view mode_name(Mode mode) {
     return mode == Mode::on_board ? "on board" : mode == Mode::on_foot ? "on foot" : "ragdoll";
 }
@@ -24,6 +29,12 @@ std::vector<Field> sample() {
         : std::format("{} {}", s.physics_state, s.physics_state_name))});
     fields.push_back({"Mode", value(std::string(mode_name(mode(s))))});
     fields.push_back({"Airborne", value(yes_no(airborne(s)))});
+    fields.push_back({"MOTION", {}, true});
+    const auto motion = [&](const game::Vec3& velocity) { return value(s.motion_known ? speed_text(velocity) : "-"); };
+    fields.push_back({"Speed", motion(velocity(s)), false, true});
+    fields.push_back({"Board", motion(s.board_velocity), false, true});
+    fields.push_back({"Body (pelvis)", motion(s.body_velocity), false, true});
+    fields.push_back({"Vertical", value(s.motion_known ? std::format("{:+.1f} m/s", velocity(s)[1]) : "-"), false, true});
     fields.push_back({"OFF THE BOARD", {}, true});
     const auto& f = s.flags;
     fields.push_back({"Substate", value(s.offboard_known ? std::string(substate_name(f.substate)) : "-")});

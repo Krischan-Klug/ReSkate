@@ -1,4 +1,5 @@
 #pragma once
+#include "client_source_spawn.h"
 #include <array>
 #include <cstdint>
 #include <string_view>
@@ -57,4 +58,22 @@ inline constexpr std::uintptr_t foot_b_planted_offset = 0x16b;
 // The block they lie in, read at once.
 inline constexpr std::uintptr_t offboard_block_offset = 0x160;
 inline constexpr std::size_t offboard_block_size = 0x30;
+
+// How fast the skater moves: the linear velocity of its physics bodies, read as the SDK's noclip
+// reads and writes them (Extension/Skater/client_noclip.cpp). The board's physics: core+0x430 ->
+// +0x18 (vtable board_physics_vtable); the skeleton's: the rig (core+0x438) -> +0x2f10 (vtable
+// rig_physics_vtable). Each keeps its bodies at +0x20: their count (uint32) at the start, body n at
+// n * 0x130, each pointing back to its owner at +0x10 with its velocity (float[3], m/s) at +0x70.
+// The board has 9, body 0 its root; the skeleton 26, body n the ragdoll's body n (skater_body.h).
+inline constexpr std::uintptr_t board_holder_offset = 0x430;  // core
+inline constexpr std::uintptr_t board_physics_offset = 0x18;  // board holder
+inline constexpr std::uintptr_t rig_physics_offset = 0x2f10;  // rig
+inline constexpr std::uintptr_t physics_bodies_offset = 0x20; // board or rig physics
+inline constexpr std::uintptr_t physics_body_size = 0x130;
+inline constexpr std::uintptr_t body_owner_offset = 0x10;
+inline constexpr std::uintptr_t body_velocity_offset = 0x70;
+inline constexpr std::uint32_t board_body_count = 9, rig_body_count = 26;
+inline constexpr std::size_t board_root_body = 0;
+inline constexpr std::uintptr_t board_physics_vtable = client_source_spawn::board_physics_vtable;
+inline constexpr std::uintptr_t rig_physics_vtable = client_source_spawn::rig_physics_vtable;
 }

@@ -7,6 +7,7 @@
 // handed belongs to it, and the chain is resolved again live before they act on it.
 namespace dingosdk {
 struct LocalSkater {
+    std::uintptr_t base{}; // the game's image base the chain was resolved in
     std::uintptr_t client{}, entity{}, player{}, handle{}, component{}, core{}, context{}, selector{}, causes{}, rig{};
     bool operator==(const LocalSkater&) const = default;
 };

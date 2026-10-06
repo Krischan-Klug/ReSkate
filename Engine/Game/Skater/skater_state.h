@@ -1,4 +1,5 @@
 #pragma once
+#include "Engine/Game/Abi/linear_transform.h"
 #include <cstdint>
 #include <string_view>
 
@@ -39,6 +40,9 @@ struct SkaterState {
     bool offboard{};            // the physics state is the off-board one: on foot or in a ragdoll
     bool offboard_known{};      // the offboard state was readable
     Offboard flags;
+    // The physics bodies' velocities, metres per second: the board's root, and the skater's pelvis.
+    bool motion_known{};
+    game::Vec3 board_velocity{}, body_velocity{};
 };
 
 // Whether mode() is known: off the board it takes the offboard state.
@@ -49,6 +53,11 @@ constexpr Mode mode(const SkaterState& state) noexcept {
     if (!state.offboard) return Mode::on_board;
     return state.offboard_known && state.flags.substate == Substate::ragdoll ? Mode::ragdoll : Mode::on_foot;
 }
+// How the skater moves: with the board while on it, else as the body (on foot, in a ragdoll).
+constexpr game::Vec3 velocity(const SkaterState& state) noexcept {
+    return mode(state) == Mode::on_board ? state.board_velocity : state.body_velocity;
+}
+inline float speed(const SkaterState& state) noexcept { return game::length(velocity(state)); }
 // In the air: on the board by the physics state; off it by the offboard state.
 constexpr bool airborne(const SkaterState& state) noexcept {
     return state.on_board_in_the_air || (state.offboard && state.offboard_known && state.flags.in_the_air);

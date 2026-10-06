@@ -69,6 +69,7 @@ bool resolve_local_skater(std::uintptr_t base, std::uintptr_t client, std::uintp
         pointer(o.selector, 8) != o.context || pointer(o.causes, 0x20) != o.context || pointer(o.rig) != o.context ||
         pointer(o.rig, 0x4630) != o.core)
         return false;
+    o.base = base;
     o.client = client;
     o.entity = entity;
     return true;
