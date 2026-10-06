@@ -32,7 +32,7 @@ constexpr ImU32 bruised = IM_COL32(255, 196, 36, 255), broken = IM_COL32(232, 32
 
 struct MeatState {
     MeatFrame frame;
-    ScoreCardCount counted;
+    ScoreCardMotion motion;
 };
 MeatState& meat() {
     static MeatState value;
@@ -76,6 +76,6 @@ bool hall_of_meat_pending() {
 void draw_hall_of_meat() {
     auto& m = meat();
     draw_meat_skeleton(m.frame.skeleton);
-    draw_score_card(m.frame.card, m.counted);
+    draw_score_card(m.frame.card, m.motion);
 }
 } // namespace dingosdk::overlay::detail

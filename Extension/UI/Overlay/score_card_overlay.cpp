@@ -15,6 +15,7 @@ namespace theme = dingosdk::skate_theme;
 using display_format::grouped;
 // From the screen's top right corner, in 1080p pixels; as wide as the logo it carries.
 constexpr float corner_right = 48.0f, corner_top = 96.0f, card_width = 250.0f;
+constexpr double row_fade_seconds = 0.3; // a new row opens and fades in this long
 
 ImU32 with_alpha(ImU32 colour, float alpha) {
     const auto a = static_cast<unsigned>(((colour >> IM_COL32_A_SHIFT) & 0xff) * std::clamp(alpha, 0.0f, 1.0f));
@@ -31,18 +32,18 @@ float text_width(ImFont* font, float size, const std::string& text) {
 }
 } // namespace
 
-void draw_score_card(const ScoreCard& card, ScoreCardCount& counted) {
+void draw_score_card(const ScoreCard& card, ScoreCardMotion& motion) {
     const auto display = ImGui::GetIO().DisplaySize;
     if (card.opacity <= 0 || display.x <= 0 || display.y <= 0) {
-        counted = {};
+        motion = {};
         return;
     }
     // The total catches up with its value in about a quarter of a second.
     const double now = ImGui::GetTime();
-    const float step = static_cast<float>(std::clamp(now - counted.at, 0.0, 0.1));
-    counted.at = now;
-    counted.total += (static_cast<float>(card.total) - counted.total) * (1.0f - std::exp(-step * 12.0f));
-    if (std::abs(static_cast<float>(card.total) - counted.total) < 1.0f) counted.total = static_cast<float>(card.total);
+    const float step = static_cast<float>(std::clamp(now - motion.at, 0.0, 0.1));
+    motion.at = now;
+    motion.total += (static_cast<float>(card.total) - motion.total) * (1.0f - std::exp(-step * 12.0f));
+    if (std::abs(static_cast<float>(card.total) - motion.total) < 1.0f) motion.total = static_cast<float>(card.total);
 
     auto& s = state();
     auto* title_font = s.menu.title ? s.menu.title : ImGui::GetFont();
@@ -55,23 +56,28 @@ void draw_score_card(const ScoreCard& card, ScoreCardCount& counted) {
     float y = corner_top * k;
     unsigned seed = 211u;
 
-    // A tile per stat: its icon, what was measured, and what it scored.
+    // A tile per stat: its icon, what was measured, and what it scored. A new one opens and fades in.
     const float row_height = 32.0f * k, icon = 22.0f * k, text = 18.0f * k;
     for (const auto& row : card.rows) {
+        const auto came = motion.since.try_emplace(row.key, now).first->second;
+        const float shown = static_cast<float>(std::clamp((now - came) / row_fade_seconds, 0.0, 1.0));
+        const float opened = shown * (2.0f - shown); // eases out
+        const auto row_fade = [&](ImU32 colour) { return with_alpha(colour, o * shown); };
         const ImVec2 min(left, y), max(right, y + row_height);
-        theme::rough_rect(draw, min, max, fade(with_alpha(theme::tile, 0.9f)), ++seed, k);
+        theme::rough_rect(draw, min, max, row_fade(with_alpha(theme::tile, 0.9f)), ++seed, k);
         const float middle = y + row_height * 0.5f;
         float x = left + pad;
         if (!row.icon.empty() &&
-            draw_game_image(draw, row.icon, ImVec2(x, middle - icon * 0.5f), ImVec2(x + icon, middle + icon * 0.5f), fade(theme::blue)))
+            draw_game_image(draw, row.icon, ImVec2(x, middle - icon * 0.5f), ImVec2(x + icon, middle + icon * 0.5f),
+                            row_fade(theme::blue)))
             x += icon + 10.0f * k;
-        shadowed(draw, bold, text, ImVec2(x, middle - text * 0.5f), fade(theme::white), row.value.c_str());
+        shadowed(draw, bold, text, ImVec2(x, middle - text * 0.5f), row_fade(theme::white), row.value.c_str());
         if (row.points) {
             const auto points = grouped(*row.points);
             shadowed(draw, bold, text, ImVec2(right - pad - text_width(bold, text, points), middle - text * 0.5f),
-                     fade(theme::white), points.c_str());
+                     row_fade(theme::white), points.c_str());
         }
-        y += row_height + 6.0f * k;
+        y += (row_height + 6.0f * k) * opened;
     }
 
     // The panel: the logo across it, the title, the total and the badge, centred, with skate.'s blue edge.
@@ -92,7 +98,7 @@ void draw_score_card(const ScoreCard& card, ScoreCardCount& counted) {
         y += logo_height + 4.0f * k;
     }
     centred(heading, title_size, fade(theme::white), card.title);
-    centred(title_font, total_size, fade(theme::white), grouped(static_cast<long long>(counted.total + 0.5f)));
+    centred(title_font, total_size, fade(theme::white), grouped(static_cast<long long>(motion.total + 0.5f)));
     if (!card.badge.empty()) {
         y += 4.0f * k;
         centred(bold, badge_size, fade(card.highlight ? theme::good : theme::grey_text), card.badge);

@@ -356,7 +356,9 @@ void add_game_images(std::vector<GameImage> images);
 // A result card for any feature (score_card_overlay.cpp), laid out like skate. 3's Hall of Meat
 // in skate.'s own colours: a row per stat, then the logo, the title and the total, in the top
 // right corner. Icons and the logo are game images' keys (add_game_images), drawn as silhouettes.
+// A row new on the card fades in, so a card can grow as its stats come.
 struct ScoreCardRow {
+    std::string key;           // the same row from frame to frame
     std::string icon;          // empty for none
     std::string value;         // what was measured, as shown: "6.2 s"
     std::optional<int> points; // what it scored; none for a stat that scores nothing

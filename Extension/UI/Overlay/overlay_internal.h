@@ -292,13 +292,14 @@ void draw_skeleton(const SkeletonFrame& skeleton, const SkeletonPaints& paints, 
 std::size_t reserve_game_images(ImFontAtlas& atlas, std::chrono::milliseconds wait) noexcept;
 void fill_game_images(ImFontAtlas& atlas) noexcept;
 bool draw_game_image(ImDrawList* draw, std::string_view key, ImVec2 min, ImVec2 max, ImU32 tint);
-// A score card (score_card_overlay.cpp) in the top right corner; `counted` is the caller's, so the
-// total counts up from what it last showed.
-struct ScoreCardCount {
+// A score card (score_card_overlay.cpp) in the top right corner. `motion` is the caller's, kept from
+// frame to frame: the total counts up from what it last showed, and a row fades in from when it came.
+struct ScoreCardMotion {
     float total{};
-    double at{};
+    double at{};                          // ImGui time of the last frame drawn
+    std::map<std::string, double> since;  // each row's key: when it came onto the card
 };
-void draw_score_card(const ScoreCard& card, ScoreCardCount& counted);
+void draw_score_card(const ScoreCard& card, ScoreCardMotion& motion);
 // The debug panel (debug_panel_overlay.cpp): polled every presented frame.
 bool debug_panel_pending();
 void draw_debug_panel();

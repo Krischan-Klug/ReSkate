@@ -40,15 +40,18 @@ overlay::ScoreCard score_card(const View& view, const Standing& against) {
     const auto& t = view.tally;
     overlay::ScoreCard card;
     card.opacity = view.alpha;
-    card.rows = {
-        {duration_icon, std::format("{:.1f} s", t.seconds), t.time_points},
-        {hits_icon, hits(t.impacts), t.hit_points + t.head_bonus + t.vehicle_bonus},
-        {broken_icon, grouped(t.broken) + " broken", t.broken * points_per_break},
-        {road_rash_icon, std::format("{:.1f} ft", display_format::feet(t.scraped)), t.scrape_points},
-        {airtime_icon, std::format("{:.1f} s", t.airtime), t.airtime_points},
-        {fall_icon, std::format("{:.1f} ft", display_format::feet(t.fallen)), t.fall_points},
-        {speed_icon, std::format("{:.1f} MPH", display_format::mph(t.top_speed)), t.speed_points},
+    const float road_rash = display_format::feet(t.scraped), fallen = display_format::feet(t.fallen),
+        speed = display_format::mph(t.top_speed);
+    const auto row = [&](bool shown, const char* key, const char* icon, std::string value, int points) {
+        if (shown) card.rows.push_back({key, icon, std::move(value), points});
     };
+    row(true, "time", duration_icon, std::format("{:.1f} s", t.seconds), t.time_points);
+    row(t.impacts >= hits_shown, "hits", hits_icon, hits(t.impacts), t.hit_points + t.head_bonus + t.vehicle_bonus);
+    row(t.broken >= broken_shown, "broken", broken_icon, grouped(t.broken) + " broken", t.broken * points_per_break);
+    row(road_rash >= road_rash_shown_feet, "road_rash", road_rash_icon, std::format("{:.1f} ft", road_rash), t.scrape_points);
+    row(t.airtime >= airtime_shown_seconds, "airtime", airtime_icon, std::format("{:.1f} s", t.airtime), t.airtime_points);
+    row(fallen >= fall_shown_feet, "fall", fall_icon, std::format("{:.1f} ft", fallen), t.fall_points);
+    row(speed >= speed_shown_mph, "speed", speed_icon, std::format("{:.1f} MPH", speed), t.speed_points);
     card.logo = logo;
     card.title = "Hall of Meat";
     card.total = t.score;

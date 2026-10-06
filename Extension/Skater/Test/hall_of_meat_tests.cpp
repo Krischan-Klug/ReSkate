@@ -5,6 +5,8 @@
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
+#include <string>
+#include <vector>
 
 using namespace dingosdk;
 using namespace dingosdk::hall_of_meat;
@@ -396,30 +398,43 @@ void the_card_shows_the_bail() {
     }
     Tracker tracker;
     check(score_card(tracker.view(t0), {}).opacity == 0 && score_card(tracker.view(t0), {}).rows.empty(), "no card while riding");
-    auto head = hit(Bone::neck1, 10.0f, true); // the head breaks
-    head.velocity = game::Vec3{10.0f, 0, 0};
-    tracker.step(t0, head);
+    tracker.step(t0, hit(Bone::neck1, 10.0f, true)); // the head breaks
     tracker.step(t0 + 16, hit(Bone::left_hand, 5.0f));
     const auto view = tracker.view(t0 + 1500);
     auto card = score_card(view, standing(0, view.tally.score));
     check(near(card.opacity, 1.0f) && card.total == view.tally.score && card.title == "Hall of Meat" && !card.logo.empty(),
-        "the Meat under the logo");
-    check(card.rows.size() == 7, "a row per stat");
-    check(card.rows[0].value == "1.5 s" && card.rows[0].points == static_cast<int>(1.5f * points_per_second + 0.5f),
-        "how long the bail lasted");
-    check(card.rows[1].value == "2 hits" && card.rows[1].points == 2 * hit_points(10.0f) + hit_points(5.0f), "the hits, the head's double");
-    check(card.rows[2].value == "1 broken" && card.rows[2].points == points_per_break, "the broken bones");
-    check(card.rows[3].value == "0.0 ft" && card.rows[3].points == 0, "no road rash");
-    check(card.rows[4].value == "0.0 s" && card.rows[4].points == 0, "no airtime");
-    check(card.rows[5].value == "0.0 ft" && card.rows[5].points == 0, "no fall");
-    check(card.rows[6].value == "22.4 MPH" && card.rows[6].points == static_cast<int>(10.0f * points_per_speed + 0.5f),
-        "the top speed, in miles per hour");
+        "the Meat under the logo, every stat counted");
+    check(card.rows.size() == 1 && card.rows[0].key == "time" && card.rows[0].value == "1.5 s" &&
+              card.rows[0].points == static_cast<int>(1.5f * points_per_second + 0.5f),
+        "a small bail shows its time alone");
     check(card.badge == "NEW BEST" && card.highlight, "the map's first bail sets its best");
     card = score_card(view, standing(99999, view.tally.score));
     check(card.badge == "BEST 99,999" && !card.highlight, "a smaller one shows the best");
     check(score_card(view, {}).badge.empty(), "an unknown best shows none");
     tracker.step(t0 + 1500, standing_up());
     check(near(score_card(tracker.view(t0 + 1500 + fade_ms / 2), {}).opacity, 0.5f), "the card fades as the skater gets up");
+
+    // A big one: off a roof for 3.5 s, five bones broken at 20 m/s, a slide of 5 m.
+    Tracker big;
+    auto falling = flying(false);
+    falling.velocity = game::Vec3{0, -10, 0};
+    auto now = keep(big, t0, 3500, falling);
+    for (const auto bone : {Bone::hips, Bone::spine, Bone::left_leg, Bone::right_leg, Bone::left_arm}) {
+        auto impact = hit(bone, broken_speed + 1.0f, true);
+        impact.velocity = game::Vec3{20, 0, 0};
+        big.step(now += 16, impact);
+    }
+    auto sliding = slide(Bone::spine1, 5.0f);
+    sliding.velocity = game::Vec3{5, 0, 0};
+    now = keep(big, now + 16, 1000, sliding);
+    card = score_card(big.view(now), {});
+    std::vector<std::string> keys;
+    for (const auto& row : card.rows) keys.push_back(row.key);
+    check(keys == std::vector<std::string>{"time", "hits", "broken", "road_rash", "airtime", "fall", "speed"},
+        "a big bail shows every stat, in its order");
+    check(card.rows[2].value == "5 broken" && card.rows[2].points == 5 * points_per_break, "the broken bones");
+    check(card.rows[6].value == "44.7 MPH" && card.rows[6].points == static_cast<int>(20.0f * points_per_speed + 0.5f),
+        "the top speed, in miles per hour");
 }
 
 void the_fall_and_the_top_speed_score() {
