@@ -272,6 +272,9 @@ void draw_skate_hud();
 // ReSkate's nametags (nametag_overlay.cpp): polled every presented frame.
 bool nametags_pending();
 void draw_nametags();
+// The debug panel (debug_panel_overlay.cpp): polled every presented frame.
+bool debug_panel_pending();
+void draw_debug_panel();
 // The profiler's HUD (drawn whenever it is on) and window (only in an interactive frame),
 // perf_overlay.cpp.
 bool perf_hud_pending();

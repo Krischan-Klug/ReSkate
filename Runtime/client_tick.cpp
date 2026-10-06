@@ -8,6 +8,7 @@
 #include "Engine/Game/World/client_state.h"
 #include "Extension/Skater/camera_observer.h"
 #include "Extension/UI/NativeMenu/native_menu.h"
+#include "Extension/Debug/debug_panel.h"
 #include "Extension/Multiplayer/Hud/native_party.h"
 #include "Extension/Multiplayer/Hud/custom_nametags.h"
 #include "Extension/Multiplayer/developer_identity.h"
@@ -605,6 +606,7 @@ void update_model(std::uintptr_t client, TickState& frame) {
         dingosdk::tick_network_objects();
     }
     if (r.observer_failed) return; // Keep the bounded restore/telemetry path available after catalog failure.
+    dingosdk::debug_panel::on_client_tick(); // every tick: some values last only a few (a landing)
     if (!has_request && now < r.next_model && state == r.previous_state) return;
     r.next_model = now + 500;
     DINGO_PROFILE_ZONE("tick/update_model/world model (500 ms)");
