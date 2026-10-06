@@ -20,6 +20,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -340,9 +341,35 @@ struct SkeletonFrame {
     std::shared_ptr<const std::vector<std::uint32_t>> triangles; // vertex indices, three a triangle
     std::shared_ptr<const std::vector<std::uint8_t>> parts;      // each vertex's body (skater_body.h)
 };
+// Images out of the installed game's data (Engine/Vfs/game_textures.h), for any feature to draw
+// in the overlay by key (overlay_images.cpp). Read in the background as they are added; drawn
+// once the overlay's next atlas holds them. A key already added keeps its first image.
+struct GameImage {
+    std::string key;
+    std::string toc, bundle, name; // the texture: superbundle TOC, bundle, resource name
+    std::uint32_t side{};          // fitted into a side x side square, its aspect kept
+    bool silhouette{};             // white with the texture's own alpha, to be drawn in any colour
+};
+void add_game_images(std::vector<GameImage> images);
+// A result card for any feature (score_card_overlay.cpp), laid out like skate. 3's Hall of Meat
+// in skate.'s own colours: a row per stat, then the logo, the title and the total, in the top
+// right corner. Icons and the logo are game images' keys (add_game_images), drawn as silhouettes.
+struct ScoreCardRow {
+    std::string icon;          // empty for none
+    std::string value;         // what was measured, as shown: "6.2 s"
+    std::optional<int> points; // what it scored; none for a stat that scores nothing
+};
+struct ScoreCard {
+    float opacity{}; // 0: no card
+    std::vector<ScoreCardRow> rows;
+    std::string logo;
+    std::string title;
+    int total{};       // counts up to its value as it changes
+    std::string badge; // beside the title, e.g. "NEW BEST" or "BEST 12,345"; empty for none
+    bool highlight{};  // the badge marks a record
+};
 // Hall of Meat: from the local skater's bail until they get up, the bones it hurt over the world,
-// each coloured by how hard it was hit, and the bail's card with its Meat as it adds up. Empty
-// parts draw nothing.
+// each coloured by how hard it was hit, and the bail's score card. Empty parts draw nothing.
 enum class MeatInjury : std::uint8_t { none, hit, broken };
 struct MeatSkeleton {
     SkeletonFrame frame;
@@ -350,20 +377,9 @@ struct MeatSkeleton {
     std::array<MeatInjury, skater_body::count> injuries{}; // each body's
     std::array<float, skater_body::count> flashes{};       // 1 the moment it is hit, falling to 0
 };
-struct MeatTally {
-    float card{};  // the card's opacity: 1 through the bail, fading as the skater gets up (0 = no card)
-    int score{};   // the Meat
-    int damage{};
-    int impacts{};
-    int broken{};      // bones
-    float road_rash{}; // metres the body slid along the ground
-    float airtime{};   // seconds in the air
-    int best{};      // on the card: the map's best Meat, this bail included (0 = unknown)
-    bool new_best{}; // this bail set it
-};
 struct MeatFrame {
     MeatSkeleton skeleton;
-    MeatTally tally;
+    ScoreCard card;
 };
 struct HallOfMeatHooks {
     MeatFrame (*frame)() = nullptr; // every presented frame

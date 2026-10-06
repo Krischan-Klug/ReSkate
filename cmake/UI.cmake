@@ -12,6 +12,8 @@ add_library(dingosdk_overlay STATIC
     Extension/UI/Overlay/nametag_overlay.cpp
     Extension/UI/Overlay/hall_of_meat_overlay.cpp
     Extension/UI/Overlay/skeleton_overlay.cpp
+    Extension/UI/Overlay/score_card_overlay.cpp
+    Extension/UI/Overlay/overlay_images.cpp
     Extension/UI/Overlay/debug_panel_overlay.cpp
     Extension/UI/Overlay/chat_emotes.cpp
     Extension/UI/Overlay/chat_rich.cpp

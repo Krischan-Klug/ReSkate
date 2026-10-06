@@ -1,4 +1,5 @@
-// The Hall of Meat model, with made-up physics steps.
+// The Hall of Meat model, with made-up physics steps, and its score card.
+#include "Extension/Skater/hall_of_meat_card.h"
 #include "Extension/Skater/hall_of_meat_model.h"
 #include <algorithm>
 #include <cmath>
@@ -346,6 +347,36 @@ void a_bail_lasts_through_its_flights() {
         "the airtime holds until the bail is over");
 }
 
+void the_card_shows_the_bail() {
+    const auto images = card_images();
+    check(images.size() == 7, "six icons and the logo");
+    for (const auto& image : images) {
+        check(image.silhouette && image.side > 0 && !image.name.empty(), "drawn as silhouettes, from a texture");
+        check(std::count_if(images.begin(), images.end(), [&](const auto& other) { return other.key == image.key; }) == 1,
+            "each under its own key");
+    }
+    Tracker tracker;
+    check(score_card(tracker.view(t0), {}).opacity == 0 && score_card(tracker.view(t0), {}).rows.empty(), "no card while riding");
+    tracker.step(t0, hit(Bone::neck1, 10.0f, true)); // the head breaks
+    tracker.step(t0 + 16, hit(Bone::left_hand, 5.0f));
+    const auto view = tracker.view(t0 + 1500);
+    auto card = score_card(view, standing(0, view.tally.score));
+    check(near(card.opacity, 1.0f) && card.total == view.tally.score && card.title == "Hall of Meat" && !card.logo.empty(),
+        "the Meat under the logo");
+    check(card.rows.size() == 6, "a row per stat");
+    check(card.rows[0].value == "1.5 s" && !card.rows[0].points, "how long the bail lasted");
+    check(card.rows[1].value == "2 hits" && card.rows[1].points == 2 * hit_points(10.0f) + hit_points(5.0f), "the hits, the head's double");
+    check(card.rows[2].value == "1 broken" && card.rows[2].points == points_per_break, "the broken bones");
+    check(card.rows[3].value == "0.0 ft" && card.rows[3].points == 0, "no road rash");
+    check(card.rows[5].value == "22.4 MPH" && !card.rows[5].points, "the hardest hit, in miles per hour");
+    check(card.badge == "NEW BEST" && card.highlight, "the map's first bail sets its best");
+    card = score_card(view, standing(99999, view.tally.score));
+    check(card.badge == "BEST 99,999" && !card.highlight, "a smaller one shows the best");
+    check(score_card(view, {}).badge.empty(), "an unknown best shows none");
+    tracker.step(t0 + 1500, standing_up());
+    check(near(score_card(tracker.view(t0 + 1500 + fade_ms / 2), {}).opacity, 0.5f), "the card fades as the skater gets up");
+}
+
 void a_bail_sets_a_best_only_by_beating_it() {
     check(standing(0, 300).new_best && standing(0, 300).best == 300, "the first bail on a map sets its best");
     check(!standing(500, 300).new_best && standing(500, 300).best == 500, "a smaller bail keeps it");
@@ -374,6 +405,7 @@ int main() {
         airtime_is_the_bails_time_in_the_air();
         a_bail_lasts_through_its_flights();
         a_bail_sets_a_best_only_by_beating_it();
+        the_card_shows_the_bail();
     } catch (const std::exception& error) {
         std::cerr << "FAILED: " << error.what() << '\n';
         return 1;

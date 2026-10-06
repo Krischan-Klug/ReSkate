@@ -116,6 +116,7 @@ struct Tally {
     int damage{};        // the hits, their bonuses and the road rash
     int score{};         // the damage and the breaks: the Meat
     float airtime{};     // seconds in the air
+    float hardest{};     // the hardest hit's speed, metres per second
 };
 // A bail's score against the best on the same map before it.
 struct Standing {
@@ -131,6 +132,7 @@ enum class Phase : std::uint8_t { riding, bailing, getting_up };
 struct View {
     Phase phase{};
     float alpha{}; // the skeleton's and the card's: 1 through the bail, fading to 0 as the skater gets up
+    std::uint64_t bail_ms{}; // how long the bail has lasted, or lasted
     std::array<Injury, skater_body::count> injuries{};
     std::array<float, skater_body::count> flashes{}; // 1 at a fresh hit, falling to 0
     Tally tally;
@@ -181,6 +183,7 @@ private:
     void hit(std::size_t bone, float speed, bool vehicle, std::uint64_t at) noexcept;
     bool end(std::uint64_t now, Summary* ended) noexcept;
     Phase phase(std::uint64_t now) const noexcept;
+    std::uint64_t bail_ms(std::uint64_t now) const noexcept;
     Tally tally() const noexcept;
     Injury injury_of(const BoneState& bone) const noexcept;
 

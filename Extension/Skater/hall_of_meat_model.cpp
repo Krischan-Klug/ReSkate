@@ -116,6 +116,10 @@ bool Tracker::end(std::uint64_t now, Summary* ended) noexcept {
     return true;
 }
 
+std::uint64_t Tracker::bail_ms(std::uint64_t now) const noexcept {
+    return phase_ != Phase::riding ? elapsed(now, started_) : elapsed(ended_, started_);
+}
+
 Phase Tracker::phase(std::uint64_t now) const noexcept {
     if (phase_ != Phase::riding) return phase_;
     return ended_ && elapsed(now, ended_) < fade_ms ? Phase::getting_up : Phase::riding;
@@ -135,8 +139,10 @@ Tally Tracker::tally() const noexcept {
         result.vehicle_bonus += vehicle_bonus(impact);
     }
     result.impacts = static_cast<int>(impact_count_);
-    for (const auto& bone : bones_)
-        if (injury(bone.peak) == Injury::broken) ++result.broken;
+    for (std::size_t index = 1; index < skater_body::count; ++index) { // 0 is the board
+        if (injury(bones_[index].peak) == Injury::broken) ++result.broken;
+        result.hardest = std::max(result.hardest, bones_[index].peak);
+    }
     result.scraped = scraped_;
     result.scrape_points = static_cast<int>(result.scraped * points_per_scraped_metre + 0.5f);
     result.damage = result.hit_points + result.head_bonus + result.vehicle_bonus + result.scrape_points;
@@ -152,6 +158,7 @@ View Tracker::view(std::uint64_t now) const noexcept {
     view.phase = phase;
     view.alpha = phase == Phase::getting_up
         ? 1.0f - static_cast<float>(elapsed(now, ended_)) / static_cast<float>(fade_ms) : 1.0f;
+    view.bail_ms = bail_ms(now);
     view.tally = tally();
     for (std::size_t index = 0; index < skater_body::count; ++index) {
         const auto& bone = bones_[index];
@@ -166,7 +173,7 @@ View Tracker::view(std::uint64_t now) const noexcept {
 Report Tracker::report(std::uint64_t now) const noexcept {
     Report report;
     report.phase = phase(now);
-    report.bail_ms = phase_ != Phase::riding ? elapsed(now, started_) : elapsed(ended_, started_);
+    report.bail_ms = bail_ms(now);
     report.tally = tally();
     report.hit = impact_count_ > 0;
     if (report.hit) report.last = impacts_[last_impact_];

@@ -119,6 +119,7 @@ add_library(dingosdk_runtime SHARED
     Extension/Skater/skater_state_debug.cpp
     Extension/Skater/no_bail.cpp
     Extension/Skater/hall_of_meat.cpp
+    Extension/Skater/hall_of_meat_card.cpp
     Extension/Skater/hall_of_meat_debug.cpp
     Extension/Skater/hall_of_meat_model.cpp
     Extension/Skater/physics_tuning.cpp

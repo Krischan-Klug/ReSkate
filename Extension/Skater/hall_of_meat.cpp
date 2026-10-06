@@ -1,4 +1,5 @@
 #include "hall_of_meat.h"
+#include "hall_of_meat_card.h"
 #include "hall_of_meat_model.h"
 #include "local_skater.h"
 #include "local_skater_body.h"
@@ -123,6 +124,7 @@ bool start() noexcept {
     }
     s.enabled.store(profile_runtime::local_preference(preference).value_or(true), std::memory_order_release);
     skater_skeleton::prepare();
+    overlay::add_game_images(card_images());
     skater_body::add_step_observer(&observe_step);
     s.ready.store(true, std::memory_order_release);
     logging::log(logging::Level::info, logging::Channel::skater, "Hall of Meat ready ({}).",
@@ -207,16 +209,7 @@ overlay::MeatFrame frame() {
     if (view.phase == Phase::riding) return {};
 
     overlay::MeatFrame result;
-    auto& tally = result.tally;
-    tally.card = view.alpha;
-    tally.score = view.tally.score;
-    tally.damage = view.tally.damage;
-    tally.impacts = view.tally.impacts;
-    tally.broken = view.tally.broken;
-    tally.road_rash = view.tally.scraped;
-    tally.airtime = view.tally.airtime;
-    tally.best = against.best;
-    tally.new_best = against.new_best;
+    result.card = score_card(view, against);
     // The skeleton as the renderer drew the skater in the latest picture, seen by its camera.
     const auto mesh = skater_skeleton::mesh();
     skater_render::Picture picture;

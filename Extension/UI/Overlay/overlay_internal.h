@@ -286,6 +286,19 @@ struct SkeletonPaint {
 };
 using SkeletonPaints = std::array<std::optional<SkeletonPaint>, skater_body::count>;
 void draw_skeleton(const SkeletonFrame& skeleton, const SkeletonPaints& paints, float alpha);
+// Game images (overlay_images.cpp): their room reserved before the atlas is built, waiting up to
+// `wait` for reads still running, and filled after; then drawn by key, fitted into a box with
+// their aspect kept, centred, in `tint`. False while the image is not in the atlas.
+std::size_t reserve_game_images(ImFontAtlas& atlas, std::chrono::milliseconds wait) noexcept;
+void fill_game_images(ImFontAtlas& atlas) noexcept;
+bool draw_game_image(ImDrawList* draw, std::string_view key, ImVec2 min, ImVec2 max, ImU32 tint);
+// A score card (score_card_overlay.cpp) in the top right corner; `counted` is the caller's, so the
+// total counts up from what it last showed.
+struct ScoreCardCount {
+    float total{};
+    double at{};
+};
+void draw_score_card(const ScoreCard& card, ScoreCardCount& counted);
 // The debug panel (debug_panel_overlay.cpp): polled every presented frame.
 bool debug_panel_pending();
 void draw_debug_panel();

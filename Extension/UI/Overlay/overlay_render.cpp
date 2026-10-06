@@ -285,10 +285,15 @@ bool setup_graphics() {
     dingosdk::overlay::load_skate_fonts(s.menu);
     // Thumbnails are read from the game's own data at startup; the read is
     // normally long finished by the time the first frame gets here.
-    // Emotes reserve their room before the park previews build the atlas, and fill it after.
+    // Emotes and game images reserve their room before the park previews build the atlas, and fill it after.
     const auto emote_count = reserve_chat_emotes(*ImGui::GetIO().Fonts, std::chrono::seconds(5));
+    const auto image_count = reserve_game_images(*ImGui::GetIO().Fonts, std::chrono::seconds(5));
     const auto preview_count = load_park_previews(*ImGui::GetIO().Fonts, std::chrono::seconds(5));
     fill_chat_emotes(*ImGui::GetIO().Fonts);
+    fill_game_images(*ImGui::GetIO().Fonts);
+    if (image_count)
+        dingosdk::logging::printf(dingosdk::logging::Level::info, dingosdk::logging::Channel::graphics,
+            "Game images: %zu ready.", image_count);
     if (emote_count)
         dingosdk::logging::printf(dingosdk::logging::Level::info, dingosdk::logging::Channel::graphics,
             "Chat emotes: %zu ready.", emote_count);
