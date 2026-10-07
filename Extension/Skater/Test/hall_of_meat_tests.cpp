@@ -378,7 +378,7 @@ void a_bail_lasts_through_its_flights() {
     // The first impact throws the body off a ledge: seconds in the air, then the second one.
     Tracker tracker;
     auto now = keep(tracker, t0, 1000, flying(false));
-    tracker.step(now, hit(Bone::hips, 9.0f, true));
+    tracker.step(now, hit(Bone::hips, broken_speed + 1.0f, true));
     const auto thrown = now;
     now = keep(tracker, now + 16, 3000, flying());
     check(tracker.view(now).phase == Phase::bailing, "a body in the air is still bailing");
