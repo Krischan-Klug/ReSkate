@@ -97,10 +97,12 @@ void draw_score_card(const ScoreCard& card, ScoreCardMotion& motion) {
         }
     }
 
-    // The panel, scratched: the logo across it, the title, the total on a blue stroke and the badge, centred.
+    // The panel, scratched: the logo across it, the title (in the logo's arch), the total on a blue stroke
+    // and the badge, centred.
     const float logo_height = 72.0f * k, title_size = 22.0f * k, total_size = 56.0f * k, badge_size = 18.0f * k;
     const float edge = 16.0f * k;
-    const float height = pad * 2.0f + (card.logo.empty() ? 0.0f : logo_height + 4.0f * k) + title_size + total_size +
+    const float logo_step = card.logo.empty() ? 0.0f : logo_height * card.logo_clear + 4.0f * k;
+    const float height = pad * 2.0f + logo_step + title_size + total_size +
                          (card.badge.empty() ? 0.0f : badge_size + 4.0f * k);
     const ImVec2 min(left, y), max(right, y + height);
     const auto panel = fade(with_alpha(theme::tile, 0.92f));
@@ -117,7 +119,7 @@ void draw_score_card(const ScoreCard& card, ScoreCardMotion& motion) {
     y += pad;
     if (!card.logo.empty()) {
         draw_game_image(draw, card.logo, ImVec2(left + pad, y), ImVec2(right - pad, y + logo_height), fade(theme::blue));
-        y += logo_height + 4.0f * k;
+        y += logo_step;
     }
     centred(heading, title_size, fade(theme::white), card.title);
     const auto total = grouped(static_cast<long long>(motion.total + 0.5f));

@@ -3,6 +3,7 @@
 #include "Engine/Vfs/game_textures.h"
 #include "Engine/Game/Build/addresses.h"
 #include "Engine/Game/Build/20260929/ui_textures.h"
+#include "Engine/Resource/image_region.h"
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
@@ -28,6 +29,13 @@ void the_overlays_textures_read(const char* game_root) {
     bool opaque{}, clear{};
     for (std::size_t i = 3; i < logo.rgba.size(); i += 4) (logo.rgba[i] ? opaque : clear) = true;
     check(opaque && clear, "the logo on a clear background");
+    const auto wordmark = frostbite::crop(logo, {ui::thrasher_wordmark.region.left, ui::thrasher_wordmark.region.top,
+        ui::thrasher_wordmark.region.right, ui::thrasher_wordmark.region.bottom});
+    bool under_arch{};
+    for (auto y = static_cast<std::uint32_t>(ui::thrasher_wordmark_arch * wordmark.height); y < wordmark.height; ++y)
+        for (auto x = wordmark.width / 5; x < wordmark.width - wordmark.width / 5; ++x)
+            under_arch |= wordmark.rgba[(std::size_t{y} * wordmark.width + x) * 4 + 3] >= 128;
+    check(!under_arch, "the wordmark's arch is clear beneath");
     bool refused{};
     try { (void)textures.read(ui::airtime.toc, ui::airtime.bundle, "ui/textures/icons/no_such_icon", 64); }
     catch (const std::runtime_error&) { refused = true; }

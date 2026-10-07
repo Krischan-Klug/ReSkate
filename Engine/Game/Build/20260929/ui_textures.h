@@ -50,6 +50,9 @@ inline constexpr Texture thrasher_wordmark{"Win32/items.toc",
     "win32/characters/maincharacters/generic/cas/clothing/licensed/thrasher/apparel/top/shirt/tshirtrelaxed/2023/colorways/"
     "thrasher_shirt_tshirtrelaxed_00004_ap_cas_main_bundlereftable",
     "characters/materials/logo/licensed/thrasher/logo_thrasher_2x1_011_co", {13.0f / 512, 39.0f / 256, 499.0f / 512, 193.0f / 256}};
+// The wordmark arches: between a fifth in from either side its letters end above this, as a fraction
+// of its height (at 55% in the middle, 69% a fifth in), leaving room beneath the arch.
+inline constexpr float thrasher_wordmark_arch = 0.70f;
 
 // skate.'s UI shapes, the stuff its menus are built from: white on clear, tinted as they are drawn.
 // A tile with rough, hand-cut edges (256 x 256): about 16 pixels of each edge are rough.

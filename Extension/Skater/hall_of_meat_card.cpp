@@ -62,6 +62,7 @@ overlay::ScoreCard score_card(const View& view, const Standing& against) {
     row(fallen >= fall_shown_feet, "fall", fall_icon, std::format("{:.1f} ft", fallen), t.fall_points);
     row(speed >= speed_shown_mph, "speed", speed_icon, std::format("{:.1f} MPH", speed), t.speed_points);
     card.logo = logo;
+    card.logo_clear = ui::thrasher_wordmark_arch;
     card.title = "Hall of Meat";
     card.total = t.score;
     if (against.new_best) {

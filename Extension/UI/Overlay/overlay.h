@@ -385,6 +385,9 @@ struct ScoreCard {
     ScoreCardSkin skin;
     std::vector<ScoreCardRow> rows;
     std::string logo;
+    // How far down the logo the title starts, as a fraction of its height: less than 1 under a logo
+    // whose lower edge arches (the THRASHER wordmark), so the title sits in the arch.
+    float logo_clear{1};
     std::string title;
     int total{};       // counts up to its value as it changes
     std::string badge; // beside the title, e.g. "NEW BEST" or "BEST 12,345"; empty for none

@@ -410,8 +410,9 @@ void the_card_shows_the_bail() {
     tracker.step(t0 + 16, hit(Bone::left_hand, 5.0f));
     const auto view = tracker.view(t0 + 1500);
     auto card = score_card(view, standing(0, view.tally.score));
-    check(near(card.opacity, 1.0f) && card.total == view.tally.score && card.title == "Hall of Meat" && added(card.logo),
-        "the Meat under the logo, every stat counted");
+    check(near(card.opacity, 1.0f) && card.total == view.tally.score && card.title == "Hall of Meat" && added(card.logo) &&
+              card.logo_clear < 1,
+        "the Meat under the logo, its title in the arch, every stat counted");
     const auto& skin = card.skin;
     check(added(skin.row) && added(skin.panel) && added(skin.scratches) && added(skin.underline),
         "drawn with the shapes it adds");
