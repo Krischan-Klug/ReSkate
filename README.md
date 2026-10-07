@@ -22,7 +22,7 @@ the launcher, the runtime that loads into the game, and the dedicated server.
   - The **Park Editor**: place, move and save objects with freecam, snapping and undo.
   - Skater options: first person, movement, boosts, noclip.
   - **Hall of Meat**: bail and see the bones you hurt, bruised ones yellow and broken ones red, with a
-    skate. 3 style Meat card: the bail's time, hits (head hits double, vehicles half again), broken bones,
+    skate. 3 style Meat card, drawn with skate.'s own brush strokes: the bail's time, hits (head hits double, vehicles half again), broken bones,
     road rash, airtime, fall and top speed, each scoring.
   - Progression, controls, graphics and multiplayer settings.
 - **Mods.**

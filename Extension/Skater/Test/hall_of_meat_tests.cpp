@@ -395,11 +395,14 @@ void a_bail_lasts_through_its_flights() {
 
 void the_card_shows_the_bail() {
     const auto images = card_images();
-    check(images.size() == 8, "seven icons and the logo");
+    check(images.size() == 13, "seven icons, the logo and five shapes");
+    const auto added = [&](const std::string& key) {
+        return std::count_if(images.begin(), images.end(), [&](const auto& image) { return image.key == key; }) == 1;
+    };
     for (const auto& image : images) {
-        check(image.silhouette && image.side > 0 && !image.name.empty(), "drawn as silhouettes, from a texture");
-        check(std::count_if(images.begin(), images.end(), [&](const auto& other) { return other.key == image.key; }) == 1,
-            "each under its own key");
+        check(image.colours != overlay::GameImageColours::original && image.side > 0 && !image.name.empty(),
+            "white to be tinted, from a texture");
+        check(added(image.key), "each under its own key");
     }
     Tracker tracker;
     check(score_card(tracker.view(t0), {}).opacity == 0 && score_card(tracker.view(t0), {}).rows.empty(), "no card while riding");
@@ -407,8 +410,11 @@ void the_card_shows_the_bail() {
     tracker.step(t0 + 16, hit(Bone::left_hand, 5.0f));
     const auto view = tracker.view(t0 + 1500);
     auto card = score_card(view, standing(0, view.tally.score));
-    check(near(card.opacity, 1.0f) && card.total == view.tally.score && card.title == "Hall of Meat" && !card.logo.empty(),
+    check(near(card.opacity, 1.0f) && card.total == view.tally.score && card.title == "Hall of Meat" && added(card.logo),
         "the Meat under the logo, every stat counted");
+    const auto& skin = card.skin;
+    check(added(skin.row) && added(skin.icon) && added(skin.panel) && added(skin.scratches) && added(skin.underline),
+        "drawn with the shapes it adds");
     check(card.rows.size() == 1 && card.rows[0].key == "time" && card.rows[0].value == "1.5 s" &&
               card.rows[0].points == static_cast<int>(1.5f * points_per_second + 0.5f),
         "a small bail shows its time alone");

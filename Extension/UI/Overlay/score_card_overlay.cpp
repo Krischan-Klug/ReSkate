@@ -3,11 +3,14 @@
 #include "Extension/UI/skate_theme.h"
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
-// A score card (overlay.h ScoreCard) for any feature, laid out like skate. 3's Hall of Meat: a tile
-// per stat with its icon, value and points, then a panel with the logo, the title and the total.
-// skate.'s own colours: dark tiles, its blue for the icons, the logo and the edge, white numbers.
-// On the background draw list in the top right corner, taking no input.
+// A score card (overlay.h ScoreCard) for any feature, laid out like skate. 3's Hall of Meat: a brush
+// bar per stat with its value and points, its icon on a block beside it, then a panel with the logo,
+// the title and the total. Drawn with skate.'s own UI shapes (ScoreCardSkin) in its colours: dark
+// bars and panel, scratched, its blue for the blocks, the logo and the stroke under the total, white
+// numbers. A shape not loaded draws a plain tile instead, or nothing. On the background draw list in
+// the top right corner, taking no input.
 
 namespace dingosdk::overlay::detail {
 namespace {
@@ -30,6 +33,12 @@ void shadowed(ImDrawList* draw, ImFont* font, float size, ImVec2 at, ImU32 colou
 float text_width(ImFont* font, float size, const std::string& text) {
     return font->CalcTextSizeA(size, FLT_MAX, 0.0f, text.c_str()).x;
 }
+
+// A stat's row where it is drawn this frame, and how far it has faded in.
+struct Line {
+    const ScoreCardRow* row{};
+    float top{}, shown{};
+};
 } // namespace
 
 void draw_score_card(const ScoreCard& card, ScoreCardMotion& motion) {
@@ -53,40 +62,59 @@ void draw_score_card(const ScoreCard& card, ScoreCardMotion& motion) {
     const float k = display.y / 1080.0f, o = card.opacity;
     const auto fade = [o](ImU32 colour) { return with_alpha(colour, o); };
     const float right = display.x - corner_right * k, left = right - card_width * k, pad = 14.0f * k;
+    const auto& skin = card.skin;
     float y = corner_top * k;
     unsigned seed = 211u;
 
-    // A tile per stat: its icon, what was measured, and what it scored. A new one opens and fades in.
-    const float row_height = 32.0f * k, icon = 22.0f * k, text = 18.0f * k;
+    // A row per stat: its icon on a block, then a bar with what was measured and what it scored. A
+    // new one opens and fades in. Each layer is drawn for every row before the next, so no row's
+    // splatter covers another's numbers.
+    const float row_height = 30.0f * k, row_gap = 10.0f * k, block = 32.0f * k, icon = 22.0f * k, text = 18.0f * k;
+    const float bar_left = left + block + 4.0f * k;
+    std::vector<Line> lines;
     for (const auto& row : card.rows) {
         const auto came = motion.since.try_emplace(row.key, now).first->second;
         const float shown = static_cast<float>(std::clamp((now - came) / row_fade_seconds, 0.0, 1.0));
-        const float opened = shown * (2.0f - shown); // eases out
-        const auto row_fade = [&](ImU32 colour) { return with_alpha(colour, o * shown); };
-        const ImVec2 min(left, y), max(right, y + row_height);
-        theme::rough_rect(draw, min, max, row_fade(with_alpha(theme::tile, 0.9f)), ++seed, k);
-        const float middle = y + row_height * 0.5f;
-        float x = left + pad;
-        if (!row.icon.empty() &&
-            draw_game_image(draw, row.icon, ImVec2(x, middle - icon * 0.5f), ImVec2(x + icon, middle + icon * 0.5f),
-                            row_fade(theme::blue)))
-            x += icon + 10.0f * k;
-        shadowed(draw, bold, text, ImVec2(x, middle - text * 0.5f), row_fade(theme::white), row.value.c_str());
+        lines.push_back({&row, y, shown});
+        y += (row_height + row_gap) * shown * (2.0f - shown); // eases out
+    }
+    for (const auto& line : lines) {
+        const ImVec2 min(bar_left, line.top), max(right, line.top + row_height);
+        const auto colour = with_alpha(theme::tile, o * line.shown * 0.92f);
+        if (!draw_game_shape(draw, skin.row, min, max, colour)) theme::rough_rect(draw, min, max, colour, ++seed, k);
+    }
+    for (const auto& line : lines) {
+        const auto& row = *line.row;
+        const float middle = line.top + row_height * 0.5f;
+        const auto row_fade = [&](ImU32 colour) { return with_alpha(colour, o * line.shown); };
+        if (!row.icon.empty()) {
+            // On skate.'s blue block, the icon is black, as on its selected tiles; without it, blue.
+            const bool on_block = draw_game_shape(draw, skin.icon, ImVec2(left, middle - block * 0.55f),
+                                                  ImVec2(left + block, middle + block * 0.55f), row_fade(theme::blue));
+            const float centre = left + block * 0.5f;
+            draw_game_image(draw, row.icon, ImVec2(centre - icon * 0.5f, middle - icon * 0.5f),
+                            ImVec2(centre + icon * 0.5f, middle + icon * 0.5f), row_fade(on_block ? theme::black : theme::blue));
+        }
+        shadowed(draw, bold, text, ImVec2(bar_left + pad, middle - text * 0.5f), row_fade(theme::white), row.value.c_str());
         if (row.points) {
             const auto points = grouped(*row.points);
             shadowed(draw, bold, text, ImVec2(right - pad - text_width(bold, text, points), middle - text * 0.5f),
                      row_fade(theme::white), points.c_str());
         }
-        y += (row_height + 6.0f * k) * opened;
     }
 
-    // The panel: the logo across it, the title, the total and the badge, centred, with skate.'s blue edge.
+    // The panel, scratched: the logo across it, the title, the total on a blue stroke and the badge, centred.
     const float logo_height = 72.0f * k, title_size = 22.0f * k, total_size = 56.0f * k, badge_size = 18.0f * k;
+    const float edge = 16.0f * k;
     const float height = pad * 2.0f + (card.logo.empty() ? 0.0f : logo_height + 4.0f * k) + title_size + total_size +
                          (card.badge.empty() ? 0.0f : badge_size + 4.0f * k);
     const ImVec2 min(left, y), max(right, y + height);
-    theme::rough_rect(draw, min, max, fade(with_alpha(theme::tile, 0.92f)), ++seed, k);
-    draw->AddRectFilled(min, ImVec2(min.x + 5.0f * k, max.y), fade(theme::blue));
+    const auto panel = fade(with_alpha(theme::tile, 0.92f));
+    if (draw_game_panel(draw, skin.panel, min, max, edge, panel))
+        draw_game_shape(draw, skin.scratches, ImVec2(min.x + edge, min.y + edge), ImVec2(max.x - edge, max.y - edge),
+                        fade(with_alpha(theme::white, 0.5f)));
+    else
+        theme::rough_rect(draw, min, max, panel, ++seed, k);
     const float centre = (left + right) * 0.5f;
     const auto centred = [&](ImFont* font, float size, ImU32 colour, const std::string& line) {
         shadowed(draw, font, size, ImVec2(centre - text_width(font, size, line) * 0.5f, y), colour, line.c_str());
@@ -98,7 +126,11 @@ void draw_score_card(const ScoreCard& card, ScoreCardMotion& motion) {
         y += logo_height + 4.0f * k;
     }
     centred(heading, title_size, fade(theme::white), card.title);
-    centred(title_font, total_size, fade(theme::white), grouped(static_cast<long long>(motion.total + 0.5f)));
+    const auto total = grouped(static_cast<long long>(motion.total + 0.5f));
+    const float stroke = text_width(title_font, total_size, total) * 0.5f + 20.0f * k;
+    draw_game_shape(draw, skin.underline, ImVec2(centre - stroke, y + total_size * 0.55f),
+                    ImVec2(centre + stroke, y + total_size * 0.95f), fade(theme::blue));
+    centred(title_font, total_size, fade(theme::white), total);
     if (!card.badge.empty()) {
         y += 4.0f * k;
         centred(bold, badge_size, fade(card.highlight ? theme::good : theme::grey_text), card.badge);

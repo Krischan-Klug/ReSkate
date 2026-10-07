@@ -345,26 +345,45 @@ struct SkeletonFrame {
 // Images out of the installed game's data (Engine/Vfs/game_textures.h), for any feature to draw
 // in the overlay by key (overlay_images.cpp). Read in the background as they are added; drawn
 // once the overlay's next atlas holds them. A key already added keeps its first image.
+enum class GameImageColours : std::uint8_t {
+    original,
+    silhouette, // white with the texture's own alpha, to be drawn in any colour
+    brightness, // white with the texture's brightness as alpha: light marks on black (scratches), in any colour
+};
 struct GameImage {
     std::string key;
     std::string toc, bundle, name; // the texture: superbundle TOC, bundle, resource name
     std::uint32_t side{};          // the texture fitted into a side x side square, its aspect kept
-    bool silhouette{};             // white with the texture's own alpha, to be drawn in any colour
-    frostbite::ImageRegion region{}; // the part of the texture kept
+    GameImageColours colours{};
+    frostbite::ImageRegion region{}; // the part of the texture kept: the picture
+    // A shape's: the part of the picture a box is laid on, the rest drawn around it (a brush
+    // stroke's bar, its splatter beyond), and how much of each edge a panel keeps unstretched
+    // (nine-slice), both as fractions of the picture's width and height.
+    frostbite::ImageRegion body{};
+    float slice{};
 };
 void add_game_images(std::vector<GameImage> images);
 // A result card for any feature (score_card_overlay.cpp), laid out like skate. 3's Hall of Meat
 // in skate.'s own colours: a row per stat, then the logo, the title and the total, in the top
-// right corner. Icons and the logo are game images' keys (add_game_images), drawn as silhouettes.
-// A row new on the card fades in, so a card can grow as its stats come.
+// right corner. Icons, the logo and the skin are game images' keys (add_game_images), white and
+// tinted as they are drawn. A row new on the card fades in, so a card can grow as its stats come.
 struct ScoreCardRow {
     std::string key;           // the same row from frame to frame
     std::string icon;          // empty for none
     std::string value;         // what was measured, as shown: "6.2 s"
     std::optional<int> points; // what it scored; none for a stat that scores nothing
 };
+// The shapes the card is drawn with; one empty or not loaded draws a plain tile instead, or nothing.
+struct ScoreCardSkin {
+    std::string row;       // a stat's bar, laid under its value and points (its body on them)
+    std::string icon;      // the block a stat's icon sits on
+    std::string panel;     // the logo's, the title's and the total's, nine-sliced
+    std::string scratches; // over the panel
+    std::string underline; // under the total
+};
 struct ScoreCard {
     float opacity{}; // 0: no card
+    ScoreCardSkin skin;
     std::vector<ScoreCardRow> rows;
     std::string logo;
     std::string title;

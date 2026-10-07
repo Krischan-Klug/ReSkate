@@ -8,7 +8,7 @@ namespace dingosdk::hall_of_meat {
 namespace {
 namespace ui = addr::ui_textures;
 using display_format::grouped;
-constexpr std::uint32_t icon_side = 64, logo_side = 512;
+constexpr std::uint32_t icon_side = 64, logo_side = 512, shape_side = 256, stroke_side = 512;
 // The images' keys.
 constexpr const char* duration_icon = "hallofmeat/stopwatch";
 constexpr const char* hits_icon = "hallofmeat/wipeout";
@@ -18,11 +18,17 @@ constexpr const char* airtime_icon = "hallofmeat/airtime";
 constexpr const char* fall_icon = "hallofmeat/gap_height";
 constexpr const char* speed_icon = "hallofmeat/flaming_wheel";
 constexpr const char* logo = "hallofmeat/thrasher";
+constexpr const char* row_bar = "hallofmeat/brush_bar";
+constexpr const char* icon_block = "hallofmeat/split_block";
+constexpr const char* panel = "hallofmeat/rough_tile";
+constexpr const char* scratches = "hallofmeat/scratches";
+constexpr const char* underline = "hallofmeat/streak";
 
-overlay::GameImage image(const char* key, const ui::Texture& texture, std::uint32_t side) {
-    const auto& r = texture.region;
-    return {key, std::string(texture.toc), std::string(texture.bundle), std::string(texture.name), side, true,
-        frostbite::ImageRegion{r.left, r.top, r.right, r.bottom}};
+frostbite::ImageRegion region(const ui::Region& r) { return {r.left, r.top, r.right, r.bottom}; }
+overlay::GameImage image(const char* key, const ui::Texture& texture, std::uint32_t side,
+                         overlay::GameImageColours colours = overlay::GameImageColours::silhouette) {
+    return {key, std::string(texture.toc), std::string(texture.bundle), std::string(texture.name), side, colours,
+        region(texture.region), region(texture.body), texture.slice};
 }
 std::string hits(int value) { return grouped(value) + (value == 1 ? " hit" : " hits"); }
 }
@@ -32,7 +38,11 @@ std::vector<overlay::GameImage> card_images() {
         image(broken_icon, ui::wipeout_broken, icon_side), image(road_rash_icon, ui::spread_eagle, icon_side),
         image(airtime_icon, ui::airtime, icon_side), image(fall_icon, ui::gap_height, icon_side),
         image(speed_icon, ui::flaming_wheel, icon_side),
-        image(logo, ui::thrasher_wordmark, logo_side)};
+        image(logo, ui::thrasher_wordmark, logo_side),
+        image(row_bar, ui::brush_bar, stroke_side), image(icon_block, ui::split_block, shape_side),
+        image(panel, ui::rough_tile, shape_side),
+        image(scratches, ui::scratches, stroke_side, overlay::GameImageColours::brightness),
+        image(underline, ui::streak, stroke_side)};
 }
 
 overlay::ScoreCard score_card(const View& view, const Standing& against) {
@@ -40,6 +50,7 @@ overlay::ScoreCard score_card(const View& view, const Standing& against) {
     const auto& t = view.tally;
     overlay::ScoreCard card;
     card.opacity = view.alpha;
+    card.skin = {row_bar, icon_block, panel, scratches, underline};
     const float road_rash = display_format::feet(t.scraped), fallen = display_format::feet(t.fallen),
         speed = display_format::mph(t.top_speed);
     const auto row = [&](bool shown, const char* key, const char* icon, std::string value, int points) {
