@@ -375,8 +375,7 @@ struct ScoreCardRow {
 };
 // The shapes the card is drawn with; one empty or not loaded draws a plain tile instead, or nothing.
 struct ScoreCardSkin {
-    std::string row;       // a stat's bar, laid under its value and points (its body on them)
-    std::string icon;      // the block a stat's icon sits on
+    std::string row;       // a stat's bar, laid under its icon, value and points (its body on them)
     std::string panel;     // the logo's, the title's and the total's, nine-sliced
     std::string scratches; // over the panel
     std::string underline; // under the total

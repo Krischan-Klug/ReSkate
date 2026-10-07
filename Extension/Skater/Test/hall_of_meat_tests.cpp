@@ -395,7 +395,7 @@ void a_bail_lasts_through_its_flights() {
 
 void the_card_shows_the_bail() {
     const auto images = card_images();
-    check(images.size() == 13, "seven icons, the logo and five shapes");
+    check(images.size() == 12, "seven icons, the logo and four shapes");
     const auto added = [&](const std::string& key) {
         return std::count_if(images.begin(), images.end(), [&](const auto& image) { return image.key == key; }) == 1;
     };
@@ -413,7 +413,7 @@ void the_card_shows_the_bail() {
     check(near(card.opacity, 1.0f) && card.total == view.tally.score && card.title == "Hall of Meat" && added(card.logo),
         "the Meat under the logo, every stat counted");
     const auto& skin = card.skin;
-    check(added(skin.row) && added(skin.icon) && added(skin.panel) && added(skin.scratches) && added(skin.underline),
+    check(added(skin.row) && added(skin.panel) && added(skin.scratches) && added(skin.underline),
         "drawn with the shapes it adds");
     check(card.rows.size() == 1 && card.rows[0].key == "time" && card.rows[0].value == "1.5 s" &&
               card.rows[0].points == static_cast<int>(1.5f * points_per_second + 0.5f),

@@ -61,9 +61,6 @@ inline constexpr Texture scratches{root_toc, root_bundle,
 // A short brush stroke with splatter (692 x 260): the bar is pixels 68 to 610 across, 79 to 184 down.
 inline constexpr Texture brush_bar{bam_toc, bam_bundle, "ui/textures/common/banner/img_bannerbrush_small_692_692_260",
     {}, {68.0f / 692, 79.0f / 260, 611.0f / 692, 185.0f / 260}};
-// A block with splits spraying off its left (256 x 256): the block is pixels 94 to 167 across, 48 to 135 down.
-inline constexpr Texture split_block{bam_toc, bam_bundle, "ui/textures/common/banner/img_banner_leftsplits_256_256_256",
-    {}, {94.0f / 256, 48.0f / 256, 168.0f / 256, 136.0f / 256}};
 // A long brush streak, thick on the left and tapering right (1024 x 152): pixels 8 to 1013 across, 30 to 115 down.
 inline constexpr Texture streak{root_toc, root_bundle, "ui/textures/common/brushs/img_brush_splashstreak_1024_1024_152",
     {}, {8.0f / 1024, 30.0f / 152, 1014.0f / 1024, 116.0f / 152}};

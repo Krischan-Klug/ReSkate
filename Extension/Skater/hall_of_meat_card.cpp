@@ -19,7 +19,6 @@ constexpr const char* fall_icon = "hallofmeat/gap_height";
 constexpr const char* speed_icon = "hallofmeat/flaming_wheel";
 constexpr const char* logo = "hallofmeat/thrasher";
 constexpr const char* row_bar = "hallofmeat/brush_bar";
-constexpr const char* icon_block = "hallofmeat/split_block";
 constexpr const char* panel = "hallofmeat/rough_tile";
 constexpr const char* scratches = "hallofmeat/scratches";
 constexpr const char* underline = "hallofmeat/streak";
@@ -39,8 +38,7 @@ std::vector<overlay::GameImage> card_images() {
         image(airtime_icon, ui::airtime, icon_side), image(fall_icon, ui::gap_height, icon_side),
         image(speed_icon, ui::flaming_wheel, icon_side),
         image(logo, ui::thrasher_wordmark, logo_side),
-        image(row_bar, ui::brush_bar, stroke_side), image(icon_block, ui::split_block, shape_side),
-        image(panel, ui::rough_tile, shape_side),
+        image(row_bar, ui::brush_bar, stroke_side), image(panel, ui::rough_tile, shape_side),
         image(scratches, ui::scratches, stroke_side, overlay::GameImageColours::brightness),
         image(underline, ui::streak, stroke_side)};
 }
@@ -50,7 +48,7 @@ overlay::ScoreCard score_card(const View& view, const Standing& against) {
     const auto& t = view.tally;
     overlay::ScoreCard card;
     card.opacity = view.alpha;
-    card.skin = {row_bar, icon_block, panel, scratches, underline};
+    card.skin = {row_bar, panel, scratches, underline};
     const float road_rash = display_format::feet(t.scraped), fallen = display_format::feet(t.fallen),
         speed = display_format::mph(t.top_speed);
     const auto row = [&](bool shown, const char* key, const char* icon, std::string value, int points) {

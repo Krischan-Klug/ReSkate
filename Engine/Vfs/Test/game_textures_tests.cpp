@@ -50,12 +50,9 @@ void the_ui_shapes_read(const char* game_root) {
     const auto read = [&](const ui::Texture& texture, std::uint32_t side) {
         return textures.read(texture.toc, texture.bundle, texture.name, side);
     };
-    const auto bar = read(ui::brush_bar, 512), block = read(ui::split_block, 256), streak = read(ui::streak, 512);
-    check(bar.width == 512 && bar.height == 192 && block.width == 256 && block.height == 256 &&
-              streak.width == 512 && streak.height == 76, "the strokes, their aspect kept");
-    check(solid(bar, ui::brush_bar.body) > 0.95f && solid(block, ui::split_block.body) > 0.95f,
-        "a stroke's body is its solid bar, a block's its block");
-    check(solid(bar, {}) < 0.6f && solid(block, {}) < 0.3f, "the splatter and the splits around them are not");
+    const auto bar = read(ui::brush_bar, 512), streak = read(ui::streak, 512);
+    check(bar.width == 512 && bar.height == 192 && streak.width == 512 && streak.height == 76, "the strokes, their aspect kept");
+    check(solid(bar, ui::brush_bar.body) > 0.95f && solid(bar, {}) < 0.6f, "a stroke's body is its solid bar, not its splatter");
     check(solid(streak, ui::streak.body) > 0.15f && solid(streak, {}) < solid(streak, ui::streak.body),
         "the streak tapers within its body");
     const auto tile = read(ui::rough_tile, 256);

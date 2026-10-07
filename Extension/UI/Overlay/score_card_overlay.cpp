@@ -6,10 +6,9 @@
 #include <vector>
 
 // A score card (overlay.h ScoreCard) for any feature, laid out like skate. 3's Hall of Meat: a brush
-// bar per stat with its value and points, its icon on a block beside it, then a panel with the logo,
-// the title and the total. Drawn with skate.'s own UI shapes (ScoreCardSkin) in its colours: dark
-// bars and panel, scratched, its blue for the blocks, the logo and the stroke under the total, white
-// numbers. A shape not loaded draws a plain tile instead, or nothing. On the background draw list in
+// bar per stat with its icon, value and points, then a panel with the logo, the title and the total.
+// Drawn with skate.'s own UI shapes (ScoreCardSkin) in its colours: dark bars and panel, scratched,
+// its blue for the icons, the logo and the stroke under the total, white numbers. A shape not loaded draws a plain tile instead, or nothing. On the background draw list in
 // the top right corner, taking no input.
 
 namespace dingosdk::overlay::detail {
@@ -66,11 +65,9 @@ void draw_score_card(const ScoreCard& card, ScoreCardMotion& motion) {
     float y = corner_top * k;
     unsigned seed = 211u;
 
-    // A row per stat: its icon on a block, then a bar with what was measured and what it scored. A
-    // new one opens and fades in. Each layer is drawn for every row before the next, so no row's
-    // splatter covers another's numbers.
-    const float row_height = 30.0f * k, row_gap = 10.0f * k, block = 32.0f * k, icon = 22.0f * k, text = 18.0f * k;
-    const float bar_left = left + block + 4.0f * k;
+    // A bar per stat: its icon, what was measured and what it scored. A new one opens and fades in.
+    // Every bar is drawn before any row's content, so no bar's splatter covers another's numbers.
+    const float row_height = 30.0f * k, row_gap = 10.0f * k, icon = 22.0f * k, text = 18.0f * k;
     std::vector<Line> lines;
     for (const auto& row : card.rows) {
         const auto came = motion.since.try_emplace(row.key, now).first->second;
@@ -79,7 +76,7 @@ void draw_score_card(const ScoreCard& card, ScoreCardMotion& motion) {
         y += (row_height + row_gap) * shown * (2.0f - shown); // eases out
     }
     for (const auto& line : lines) {
-        const ImVec2 min(bar_left, line.top), max(right, line.top + row_height);
+        const ImVec2 min(left, line.top), max(right, line.top + row_height);
         const auto colour = with_alpha(theme::tile, o * line.shown * 0.92f);
         if (!draw_game_shape(draw, skin.row, min, max, colour)) theme::rough_rect(draw, min, max, colour, ++seed, k);
     }
@@ -87,15 +84,12 @@ void draw_score_card(const ScoreCard& card, ScoreCardMotion& motion) {
         const auto& row = *line.row;
         const float middle = line.top + row_height * 0.5f;
         const auto row_fade = [&](ImU32 colour) { return with_alpha(colour, o * line.shown); };
-        if (!row.icon.empty()) {
-            // On skate.'s blue block, the icon is black, as on its selected tiles; without it, blue.
-            const bool on_block = draw_game_shape(draw, skin.icon, ImVec2(left, middle - block * 0.55f),
-                                                  ImVec2(left + block, middle + block * 0.55f), row_fade(theme::blue));
-            const float centre = left + block * 0.5f;
-            draw_game_image(draw, row.icon, ImVec2(centre - icon * 0.5f, middle - icon * 0.5f),
-                            ImVec2(centre + icon * 0.5f, middle + icon * 0.5f), row_fade(on_block ? theme::black : theme::blue));
-        }
-        shadowed(draw, bold, text, ImVec2(bar_left + pad, middle - text * 0.5f), row_fade(theme::white), row.value.c_str());
+        float x = left + pad;
+        if (!row.icon.empty() &&
+            draw_game_image(draw, row.icon, ImVec2(x, middle - icon * 0.5f), ImVec2(x + icon, middle + icon * 0.5f),
+                            row_fade(theme::blue)))
+            x += icon + 10.0f * k;
+        shadowed(draw, bold, text, ImVec2(x, middle - text * 0.5f), row_fade(theme::white), row.value.c_str());
         if (row.points) {
             const auto points = grouped(*row.points);
             shadowed(draw, bold, text, ImVec2(right - pad - text_width(bold, text, points), middle - text * 0.5f),
