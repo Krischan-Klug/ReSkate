@@ -41,9 +41,11 @@ enum class Injury : std::uint8_t { none, hit, broken };
 
 // Impact speeds along the contact normal, from the bails logged on 2026-10-04: a fall on
 // flat ground hits the bones it lands on at 3 to 6 m/s and grazes the rest at 2 to 3; a
-// hard landing hits the legs at 8 to 10, a drop from height everything at 13 to 35.
-inline constexpr float hit_speed = 4.0f;
-inline constexpr float broken_speed = 8.0f;
+// hard landing hits the legs at 8 to 10, a drop from height everything at 13 to 35. Raised a
+// little on 2026-10-07: a hard fall on flat ground (bones at 7.5 to 9.3) broke six bones, a
+// graze at 4.1 bruised; now it breaks three, and drops from height still break everything.
+inline constexpr float hit_speed = 4.5f;
+inline constexpr float broken_speed = 9.0f;
 // A wipeout whose ragdoll does not begin within this long was a stumble: its bail ends.
 inline constexpr std::uint64_t ragdoll_wait_ms = 500;
 // The body has come to rest once it moves slower than still_speed for rest_ms: from then on
