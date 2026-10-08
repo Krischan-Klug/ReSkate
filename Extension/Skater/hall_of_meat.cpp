@@ -37,6 +37,8 @@ struct State {
     Standing standing;
     std::string level; // client thread only
     GameSpeed game_speed; // client thread only: the slow motion after a break
+    std::atomic<float> step_seconds{};     // the latest physics step's length
+    std::atomic<std::uint64_t> step_count{}; // physics steps seen
 };
 State& state() { static auto* value = new State; return *value; }
 
@@ -56,6 +58,8 @@ void finished(State& s, const Summary& ended) noexcept {
 void observe_step(const skater_body::Step& body_step) noexcept {
     auto& s = state();
     if (!s.enabled.load(std::memory_order_acquire)) return;
+    s.step_seconds.store(body_step.seconds, std::memory_order_relaxed);
+    s.step_count.fetch_add(1, std::memory_order_relaxed);
     const auto now = GetTickCount64();
     Step step;
     step.seconds = body_step.seconds;
@@ -217,6 +221,11 @@ Report report() noexcept {
 }
 
 bool slowing() noexcept { return state().game_speed.held(); }
+
+Steps steps() noexcept {
+    const auto& s = state();
+    return {s.step_seconds.load(std::memory_order_relaxed), s.step_count.load(std::memory_order_relaxed)};
+}
 
 overlay::MeatFrame frame() {
     auto& s = state();

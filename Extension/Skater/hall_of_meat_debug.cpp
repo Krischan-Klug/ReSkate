@@ -3,6 +3,7 @@
 #include "local_skater.h"
 #include "local_skater_state.h"
 #include "Extension/Settings/named_settings.h"
+#include <Windows.h>
 #include <format>
 #include <string>
 
@@ -31,6 +32,19 @@ std::string body() {
     }
     return "ragdoll";
 }
+// The local skater's physics steps each real second, counted over the last whole second.
+std::string steps_per_second() {
+    static std::uint64_t counted_at{}, counted{};
+    static std::string rate = "-";
+    const auto now = GetTickCount64();
+    const auto count = steps().count;
+    if (!counted_at || now - counted_at >= 1000) {
+        if (counted_at) rate = std::to_string((count - counted) * 1000 / (now - counted_at));
+        counted_at = now;
+        counted = count;
+    }
+    return rate;
+}
 // A native setting as the engine holds it now, "-" when it cannot be read.
 std::string setting(std::string_view name) { return read_named_setting(name).value_or("-"); }
 // What made a hit count more: "head", "vehicle", both or nothing.
@@ -54,6 +68,9 @@ std::vector<Field> sample() {
     fields.push_back({"TimeScale", setting("SimulationTime.TimeScale")});
     fields.push_back({"ForceSimRate", setting("SimulationTime.ForceSimRate")});
     fields.push_back({"MaxSimFps", setting("SimulationTime.MaxSimFps")});
+    // What the skater's physics runs at: each step's length, and how many come each real second.
+    fields.push_back({"Step", std::format("{:.2f} ms", steps().seconds * 1000.0f)});
+    fields.push_back({"Steps/s", steps_per_second()});
     fields.push_back({"MEAT", {}, true});
     fields.push_back({"Meat", std::to_string(t.score)});
     fields.push_back({"Hits", std::format("{} ({})", t.hit_points, t.impacts)});
