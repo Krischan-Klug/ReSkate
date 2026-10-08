@@ -29,6 +29,9 @@ add_library(dingosdk_runtime SHARED
     Extension/UI/NativeMenu/native_menu_dump.cpp
     Extension/UI/NativeMenu/native_hub.cpp
     Extension/UI/NativeMenu/native_menu_data.cpp
+    Extension/UI/NativeUi/model_takeover.cpp
+    Extension/UI/NativeHud/hud_corner.cpp
+    Extension/UI/NativeHud/hud_corner_debug.cpp
     Extension/Multiplayer/Remote/native_skater.cpp
     Extension/Multiplayer/Remote/native_skater_spawn.cpp
     Extension/Multiplayer/Remote/puppet_cost.cpp
@@ -97,6 +100,7 @@ add_library(dingosdk_runtime SHARED
     Extension/World/physics_world_size.cpp
     Extension/Rendering/display_startup.cpp
     Extension/Rendering/replay_export.cpp
+    Extension/Rendering/local_skater_render.cpp
     Engine/Game/World/world_model.cpp
     Extension/World/level_loading.cpp
     Extension/World/loading_screen.cpp
@@ -111,7 +115,18 @@ add_library(dingosdk_runtime SHARED
     Extension/Skater/client_first_person.cpp
     Extension/Skater/client_debug.cpp
     Extension/Skater/ai_skaters.cpp
+    Extension/Skater/local_skater.cpp
+    Extension/Skater/local_skater_state.cpp
+    Extension/Skater/local_skater_body.cpp
+    Extension/Skater/skeleton_mesh.cpp
+    Engine/Game/Skater/skater_skeleton.cpp
+    Extension/Skater/skater_body_debug.cpp
+    Extension/Skater/skater_state_debug.cpp
     Extension/Skater/no_bail.cpp
+    Extension/Skater/hall_of_meat.cpp
+    Extension/Skater/hall_of_meat_card.cpp
+    Extension/Skater/hall_of_meat_debug.cpp
+    Extension/Skater/hall_of_meat_model.cpp
     Extension/Skater/physics_tuning.cpp
     Extension/Multiplayer/Remote/remote_collision.cpp
     Extension/Skater/physics_tuning_model.cpp

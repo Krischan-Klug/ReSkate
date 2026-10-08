@@ -1,0 +1,34 @@
+#pragma once
+#include "local_skater.h"
+#include "Engine/Game/Skater/skater_body.h"
+#include <cstdint>
+
+// The local skater's body (Engine/Game/Skater/skater_body.h), read from the game
+// (Engine/Game/Build/20260929/skater_body.h) for any feature that needs it: every physics
+// step as it happens, and each body's contacts in it. Read-only; the steps
+// come from No Bail's hook on the skeleton response, which runs once per physics step right
+// after the step's body contacts.
+namespace dingosdk::skater_body {
+// Requires the validated build and No Bail started: verifies the layout once.
+bool start(std::uintptr_t image_base) noexcept;
+bool available() noexcept;
+
+// One physics step of the local skater (local_skater.h, verified again), as the skeleton
+// takes it: a wipeout No Bail filtered never happened.
+struct Step {
+    LocalSkater skater;
+    bool wipeout{};
+};
+// Physics thread, in the step: reads made here see exactly this step's values.
+using StepObserver = void (*)(const Step&) noexcept;
+inline constexpr std::size_t max_step_observers = 4;
+// False when the observer is already there or all places are taken.
+bool add_step_observer(StepObserver observer) noexcept;
+// No Bail's skeleton hook: every physics step of any skater's rig.
+void on_physics_step(std::uintptr_t rig, bool wipeout) noexcept;
+
+// Everything the latest physics step's contact processing kept of each body; false when it
+// is not readable. Exact in a step observer; read outside the physics step (from the client
+// tick, say), a step may be half written.
+bool read_contacts(const LocalSkater& skater, Contacts& contacts) noexcept;
+}

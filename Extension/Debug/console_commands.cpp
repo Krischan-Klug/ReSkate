@@ -1,5 +1,6 @@
 #include "Extension/Console/commands.h"
 #include "debug_panel.h"
+#include "Extension/UI/NativeHud/hud_corner.h"
 
 namespace dingosdk::console {
 void register_debug_commands(Commands &registry) {
@@ -39,5 +40,19 @@ void register_debug_commands(Commands &registry) {
         out("error: source must be one of: off" + ids);
     };
     registry.add(std::move(panel));
+
+    // Covering skate.'s bottom left HUD corner (Extension/UI/NativeHud/hud_corner.h) by hand, to try it without a feature.
+    auto cover = argument("none|dpad|all");
+    cover.choices = {"none", "dpad", "all"};
+    auto corner = action("hudcorner", "Cover skate.'s bottom left HUD corner: dpad hides the d-pad, all the score HUD too, "
+        "none gives it back (not saved)", Group::console, {cover});
+    corner.execution = Execution::local;
+    corner.run = [](const Model &, const Values &args, const Output &out) {
+        const auto word = lower(std::get<std::string>(args[0]));
+        const auto chosen = word == "all" ? hud_corner::Cover::all : word == "dpad" ? hud_corner::Cover::dpad : hud_corner::Cover::none;
+        hud_corner::set_cover("console", chosen);
+        out("HUD corner covered: " + std::string(hud_corner::name(chosen)) + ".");
+    };
+    registry.add(std::move(corner));
 }
 } // namespace dingosdk::console

@@ -112,6 +112,18 @@ int main() {
         const auto find = [](const std::vector<Row>& rows, std::string_view id) {
             return std::find_if(rows.begin(), rows.end(), [&](const auto& row) { return row.id == id; });
         };
+        // Hall of Meat sits with the player's other switches.
+        const auto meat_row = [&] {
+            const auto page = render(state, model, cb, player_section);
+            return *find(page.main, "hall-of-meat");
+        };
+        check(meat_row().title == "Hall of Meat: Off" && meat_row().command.empty(), "Hall of Meat waits until it started");
+        model.debug.hall_of_meat_available = true;
+        activate(state, model, cb, "hall-of-meat", "");
+        check(meat_row().command == "hall-of-meat" && capture.command == "hallofmeat on", "Hall of Meat turns on");
+        model.debug.hall_of_meat = true;
+        activate(state, model, cb, "hall-of-meat", "");
+        check(meat_row().title == "Hall of Meat: On" && capture.command == "hallofmeat off", "and off again");
         model.multiplayer.local_name = "steam_name";
         model.player_card = {true, "Card Name", {}};
         const auto card_page = render(state, model, cb, player_section);
