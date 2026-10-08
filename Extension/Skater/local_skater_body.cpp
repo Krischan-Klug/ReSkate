@@ -100,6 +100,19 @@ std::uintptr_t step_length_address() noexcept {
     return input + build::step_input_length_offset;
 }
 
+bool set_step_length(float seconds) noexcept {
+    const auto address = step_length_address();
+    float current{};
+    if (!address || !memory::peek(address, current)) return false;
+    if (current == seconds) return true;
+    __try {
+        *reinterpret_cast<volatile float*>(address) = seconds; // read by the physics thread each step
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
 bool read_contacts(const LocalSkater& skater, Contacts& result) noexcept {
     using namespace build;
     result = {};

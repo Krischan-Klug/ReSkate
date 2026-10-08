@@ -61,13 +61,15 @@ std::vector<Field> sample() {
     fields.push_back({"BAIL", {}, true});
     fields.push_back({"Phase", std::string(phase_name(r.phase))});
     fields.push_back({"Body", body()});
-    // The slow motion after a break, and the native setting it holds (Extension/Settings/game_speed.h).
+    // The slow motion after a break, and the native settings it holds (Extension/Settings/game_speed.h).
     fields.push_back({"GAME SPEED", {}, true});
     fields.push_back({"Wanted", std::format("{:.2f}", r.game_speed), false, true});
     fields.push_back({"Held", debug_panel::yes_no(slowing())});
     fields.push_back({"TimeScale", setting("SimulationTime.TimeScale")});
-    // What the skater's physics runs at: each step's length (taken from the simulation rate when it
-    // spawns or is teleported), and how many come each real second.
+    fields.push_back({"ForceSimRate", setting("SimulationTime.ForceSimRate")});
+    fields.push_back({"MaxSimFps", setting("SimulationTime.MaxSimFps")});
+    // What the skater's physics runs at: each step's length (the game's from its core's build, the
+    // slow motion's while it holds the rate), and how many come each real second.
     fields.push_back({"Step", std::format("{:.2f} ms", steps().seconds * 1000.0f)});
     fields.push_back({"Steps/s", steps_per_second()});
     fields.push_back({"MEAT", {}, true});
