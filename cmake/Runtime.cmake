@@ -12,6 +12,9 @@ add_library(dingosdk_runtime SHARED
     Extension/Console/commands.cpp
     Extension/Console/perf_commands.cpp
     Extension/Skater/console_commands.cpp
+    Extension/Debug/console_commands.cpp
+    Extension/Debug/debug_panel.cpp
+    Extension/Debug/debug_panel_model.cpp
     Extension/Multiplayer/console_commands.cpp
     Extension/Multiplayer/Session/session.cpp
     Extension/Multiplayer/Session/session_view.cpp
