@@ -17,6 +17,7 @@ bool available() noexcept;
 // takes it: a wipeout No Bail filtered never happened.
 struct Step {
     LocalSkater skater;
+    float seconds{}; // how long the step simulates: the game's time, slower than the real one in slow motion
     bool wipeout{};
 };
 // Physics thread, in the step: reads made here see exactly this step's values.
@@ -24,8 +25,8 @@ using StepObserver = void (*)(const Step&) noexcept;
 inline constexpr std::size_t max_step_observers = 4;
 // False when the observer is already there or all places are taken.
 bool add_step_observer(StepObserver observer) noexcept;
-// No Bail's skeleton hook: every physics step of any skater's rig.
-void on_physics_step(std::uintptr_t rig, bool wipeout) noexcept;
+// No Bail's skeleton hook: every physics step of any skater's rig, `seconds` long.
+void on_physics_step(std::uintptr_t rig, float seconds, bool wipeout) noexcept;
 
 // Everything the latest physics step's contact processing kept of each body; false when it
 // is not readable. Exact in a step observer; read outside the physics step (from the client

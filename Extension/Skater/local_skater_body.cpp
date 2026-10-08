@@ -81,13 +81,13 @@ bool add_step_observer(StepObserver observer) noexcept {
     return false;
 }
 
-void on_physics_step(std::uintptr_t rig, bool wipeout) noexcept {
+void on_physics_step(std::uintptr_t rig, float seconds, bool wipeout) noexcept {
     auto& s = state();
     if (!s.ready.load(std::memory_order_acquire) ||
         std::none_of(s.observers.begin(), s.observers.end(), [](const auto& slot) { return slot.load(std::memory_order_acquire); }))
         return;
     LastError error;
-    Step step{{}, wipeout};
+    Step step{{}, seconds, wipeout};
     if (!local_skater_owns(rig, &LocalSkater::rig, &step.skater)) return;
     for (const auto& slot : s.observers)
         if (const auto observer = slot.load(std::memory_order_acquire)) observer(step);
