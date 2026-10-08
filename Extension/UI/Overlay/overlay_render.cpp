@@ -7,8 +7,32 @@
 #include "chat_emotes.h"
 #include "input_capture.h"
 #include "cursor.h"
+#include <imgui_internal.h>
 
 namespace dingosdk::overlay::detail {
+
+// ImGui draws into the swapchain's back buffer, so its display is the buffer, in the buffer's
+// pixels. The Win32 backend sizes the display by the window's client area and places the mouse in
+// it; the two differ whenever the window is measured in other units than the buffer: a window
+// Windows scales for the display (a 1920x1080 client on a 4K display at 200%, borderless) or a
+// buffer stretched to the window. Every mouse position queued since the last frame comes in client
+// coordinates and is mapped into the buffer once.
+void fit_display_to_buffer(State& s, ID3D12Resource* buffer) {
+    auto& io = ImGui::GetIO();
+    const auto description = buffer->GetDesc();
+    const ImVec2 client = io.DisplaySize;
+    const ImVec2 pixels(static_cast<float>(description.Width), static_cast<float>(description.Height));
+    if (client.x <= 0 || client.y <= 0 || pixels.x <= 0 || pixels.y <= 0) return;
+    io.DisplaySize = pixels;
+    const ImVec2 scale(pixels.x / client.x, pixels.y / client.y);
+    for (auto& event : ImGui::GetCurrentContext()->InputEventsQueue) {
+        if (event.Type != ImGuiInputEventType_MousePos || event.EventId <= s.mapped_mouse_event) continue;
+        s.mapped_mouse_event = event.EventId;
+        if (event.MousePos.PosX == -FLT_MAX) continue; // the mouse left the window
+        event.MousePos.PosX *= scale.x;
+        event.MousePos.PosY *= scale.y;
+    }
+}
 
 bool completed(UINT64 value, DWORD timeout_ms) {
     auto& s = state();
@@ -277,6 +301,7 @@ bool setup_graphics() {
     if (!s.fence_event) return false;
     ImGuiContext* previous = ImGui::GetCurrentContext();
     s.context = ImGui::CreateContext();
+    s.mapped_mouse_event = 0; // a new context numbers its events afresh
     ImGui::SetCurrentContext(s.context);
     ImGui::GetIO().IniFilename = nullptr;
     ImGui::GetIO().LogFilename = nullptr;
@@ -511,6 +536,7 @@ void render(IDXGISwapChain* presented, UINT flags) {
     ImGui_ImplDX12_NewFrame();
     { OverlayInputAccess access; ImGui_ImplWin32_NewFrame(); }
     update_menu_pointer();
+    fit_display_to_buffer(s, frame.buffer.Get());
     ImGui::NewFrame();
     if (menu_frame) {
         draw_menu();
