@@ -273,6 +273,21 @@ void draw_skate_hud();
 // ReSkate's nametags (nametag_overlay.cpp): polled every presented frame.
 bool nametags_pending();
 void draw_nametags();
+// `colour` at `opacity` (0 to 1) of its own alpha.
+inline ImU32 scaled_alpha(ImU32 colour, float opacity) {
+    const auto alpha = static_cast<ImU32>(((colour >> IM_COL32_A_SHIFT) & 0xff) * std::clamp(opacity, 0.0f, 1.0f));
+    return (colour & ~IM_COL32_A_MASK) | (alpha << IM_COL32_A_SHIFT);
+}
+// Text over a soft drop shadow, the shadow as see-through as the text.
+inline void shadowed_text(ImDrawList* draw, ImFont* font, float size, ImVec2 at, ImU32 colour, const char* text) {
+    const float offset = std::max(1.0f, size / 16.0f);
+    const float opacity = static_cast<float>((colour >> IM_COL32_A_SHIFT) & 0xff) / 255.0f;
+    draw->AddText(font, size, ImVec2(at.x + offset, at.y + offset), scaled_alpha(IM_COL32_BLACK, opacity * 0.7f), text);
+    draw->AddText(font, size, at, colour, text);
+}
+// The debug panel (debug_panel_overlay.cpp): polled every presented frame.
+bool debug_panel_pending();
+void draw_debug_panel();
 // The profiler's HUD (drawn whenever it is on) and window (only in an interactive frame),
 // perf_overlay.cpp.
 bool perf_hud_pending();
