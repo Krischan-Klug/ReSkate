@@ -70,6 +70,8 @@ add_library(dingosdk_runtime SHARED
     Extension/Settings/engine_tweaks.cpp
     Extension/UI/ui_pointer_skip.cpp
     Extension/Settings/named_settings.cpp
+    Extension/Settings/setting_hold.cpp
+    Extension/Settings/game_speed.cpp
     Extension/World/console_commands.cpp
     Extension/Rendering/console_commands.cpp
     Extension/Progression/console_commands.cpp
