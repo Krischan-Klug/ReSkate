@@ -310,10 +310,15 @@ bool setup_graphics() {
     dingosdk::overlay::load_skate_fonts(s.menu);
     // Thumbnails are read from the game's own data at startup; the read is
     // normally long finished by the time the first frame gets here.
-    // Emotes reserve their room before the park previews build the atlas, and fill it after.
+    // Emotes and game images reserve their room before the park previews build the atlas, and fill it after.
     const auto emote_count = reserve_chat_emotes(*ImGui::GetIO().Fonts, std::chrono::seconds(5));
+    const auto image_count = reserve_game_images(*ImGui::GetIO().Fonts, std::chrono::seconds(5));
     const auto preview_count = load_park_previews(*ImGui::GetIO().Fonts, std::chrono::seconds(5));
     fill_chat_emotes(*ImGui::GetIO().Fonts);
+    fill_game_images(*ImGui::GetIO().Fonts);
+    if (image_count)
+        dingosdk::logging::printf(dingosdk::logging::Level::info, dingosdk::logging::Channel::graphics,
+            "Game images: %zu ready.", image_count);
     if (emote_count)
         dingosdk::logging::printf(dingosdk::logging::Level::info, dingosdk::logging::Channel::graphics,
             "Chat emotes: %zu ready.", emote_count);
@@ -478,6 +483,7 @@ void render(IDXGISwapChain* presented, UINT flags) {
     const bool game_text_frame = game_text_pending();
     const bool skate_hud_frame = skate_hud_pending();
     const bool nametag_frame = nametags_pending();
+    const bool meat_frame = hall_of_meat_pending();
     const bool debug_panel_frame = debug_panel_pending();
     const bool perf_frame = perf_hud_pending() || trainer_hud_pending();
     if (trainer_open_requested()) s.visible.store(true);
@@ -497,7 +503,7 @@ void render(IDXGISwapChain* presented, UINT flags) {
         }
         // Hidden, the overlay still draws while a notice or chat line is on screen.
         if (s.loaded_notice_posted && !notices_pending() && !chat_frame && !game_text_frame && !skate_hud_frame &&
-            !nametag_frame && !debug_panel_frame && !perf_frame) return;
+            !nametag_frame && !meat_frame && !debug_panel_frame && !perf_frame) return;
     } else if (!s.ui_was_interactive) {
         s.ui_was_interactive = true;
         s.last_model = {}; // Reopening immediately reads fresh state.
@@ -544,6 +550,7 @@ void render(IDXGISwapChain* presented, UINT flags) {
         draw_console();
         draw_perf_window();
     }
+    draw_hall_of_meat();
     draw_debug_panel();
     draw_nametags();
     draw_game_text();

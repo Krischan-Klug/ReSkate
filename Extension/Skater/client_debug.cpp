@@ -1,5 +1,7 @@
 #include "client_source_spawn.h"
 #include "client_source_spawn_internal.h"
+#include "hall_of_meat.h"
+#include "local_skater.h"
 #include "no_bail.h"
 #include "Engine/Core/Log/logging.h"
 #include "Engine/Core/Platform/launcher_support.h"
@@ -502,8 +504,9 @@ void debug_action(SourceTrial& trial, std::uintptr_t client, bool can_control, b
         source_require(session_no_bail_allowed(), "The host has turned off No Bail in this session.");
         overlay::DebugModel skater;
         (void)debug_skater(trial.base, client, skater);
-        source_require(update_no_bail(client, skater.skater_identity, true, debug.noclip && debug.noclip_velocity.valid,
-            debug.noclip_velocity.expires), "No Bail is unavailable for the current skater.");
+        source_require(publish_local_skater(trial.base, client, skater.skater_identity) &&
+            update_no_bail(true, debug.noclip && debug.noclip_velocity.valid, debug.noclip_velocity.expires),
+            "No Bail is unavailable for the current skater.");
         debug.no_bail = true;
         mark_debug_changed(debug);
         debug.status = "No Bail enabled. Prevents new wipeouts; recover first if already bailed.";
@@ -767,8 +770,12 @@ overlay::DebugModel on_client_debug_tick(std::uintptr_t base, std::uintptr_t cli
         debug.noclip ? "Disable Noclip before using Up Boost." :
         !state.velocity_guard_active.load(std::memory_order_acquire) ? "Up Boost is unavailable for this game build." :
         "Local skater physics could not be read.";
+    bool local_skater = false;
     try {
         (void)debug_skater(base, client, model);
+        // The skater No Bail and the Hall of Meat act on, published before the boost checks
+        // below, which may refuse a skater that is still the local one (local_skater.h).
+        local_skater = can_control && publish_local_skater(base, client, model.skater_identity);
         const auto bodies = debug_noclip_bodies(base, client, model.skater_identity);
         if (debug.forward_velocity.valid && (GetTickCount64() >= debug.forward_velocity.expires ||
             debug.forward_velocity.entity != model.skater_identity || debug.forward_velocity.core != bodies.core)) {
@@ -798,7 +805,7 @@ overlay::DebugModel on_client_debug_tick(std::uintptr_t base, std::uintptr_t cli
         } else if (debug.up_velocity.valid) {
             model.up_velocity_unavailable = "Up Boost is being applied.";
         }
-        model.no_bail_available = can_control && update_no_bail(client, model.skater_identity, debug.no_bail && no_bail_allowed,
+        model.no_bail_available = local_skater && update_no_bail(debug.no_bail && no_bail_allowed,
             debug.noclip && debug.noclip_velocity.valid, debug.noclip_velocity.expires);
         if (model.camera_available) {
             if (!model.no_bail_available) model.noclip_unavailable = "Waiting for local No Bail protection.";
@@ -819,6 +826,7 @@ overlay::DebugModel on_client_debug_tick(std::uintptr_t base, std::uintptr_t cli
         model.forward_velocity_unavailable = "Local skater physics could not be read.";
         model.up_velocity_unavailable = "Local skater physics could not be read.";
     }
+    if (!local_skater) clear_local_skater();
     if (!session_boosts_allowed()) {
         model.forward_velocity_available = model.up_velocity_available = false;
         model.forward_velocity_unavailable = model.up_velocity_unavailable = "The host has turned off boosts in this session.";
@@ -837,6 +845,8 @@ overlay::DebugModel on_client_debug_tick(std::uintptr_t base, std::uintptr_t cli
     // Noclip's own flight protection stays; only the manual toggle is the host's to refuse.
     if (!no_bail_allowed) model.no_bail_available = false;
     model.no_bail = debug.no_bail && no_bail_allowed;
+    model.hall_of_meat_available = hall_of_meat::available();
+    model.hall_of_meat = hall_of_meat::enabled();
     model.no_bail_active = model.no_bail_available && ((debug.no_bail && no_bail_allowed) ||
         (debug.noclip && debug.noclip_velocity.valid && GetTickCount64() < debug.noclip_velocity.expires));
     model.settings_owned = debug_has_lease(debug);
