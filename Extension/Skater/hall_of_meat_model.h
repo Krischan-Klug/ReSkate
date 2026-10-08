@@ -200,6 +200,7 @@ struct Report {
     Tally tally;
     bool hit{};              // the bail has a hit: last is it
     Impact last;
+    float game_speed{1.0f};  // how fast the game is to run now (Tracker::game_speed)
 };
 // A finished bail, for the log and the map's best.
 struct Summary {

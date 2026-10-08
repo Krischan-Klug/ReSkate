@@ -1,5 +1,8 @@
 #include "hall_of_meat_debug.h"
 #include "hall_of_meat.h"
+#include "local_skater.h"
+#include "local_skater_state.h"
+#include "Extension/Settings/named_settings.h"
 #include <format>
 #include <string>
 
@@ -16,6 +19,20 @@ std::string_view phase_name(Phase phase) {
     }
     return "riding";
 }
+// The local skater's body: on the board, on foot or a ragdoll; "-" while there is none to read.
+std::string body() {
+    LocalSkater skater;
+    skater_state::SkaterState state;
+    if (!current_local_skater(skater) || !skater_state::read(skater, state) || !skater_state::mode_known(state)) return "-";
+    switch (skater_state::mode(state)) {
+    case skater_state::Mode::on_board: return "on board";
+    case skater_state::Mode::on_foot: return "on foot";
+    case skater_state::Mode::ragdoll: break;
+    }
+    return "ragdoll";
+}
+// A native setting as the engine holds it now, "-" when it cannot be read.
+std::string setting(std::string_view name) { return read_named_setting(name).value_or("-"); }
 // What made a hit count more: "head", "vehicle", both or nothing.
 std::string bonuses(const Impact& impact) {
     const bool on_head = head(impact.bone);
@@ -29,6 +46,14 @@ std::vector<Field> sample() {
     std::vector<Field> fields;
     fields.push_back({"BAIL", {}, true});
     fields.push_back({"Phase", std::string(phase_name(r.phase))});
+    fields.push_back({"Body", body()});
+    // The slow motion after a break, and the native settings it holds (Extension/Settings/game_speed.h).
+    fields.push_back({"GAME SPEED", {}, true});
+    fields.push_back({"Wanted", std::format("{:.2f}", r.game_speed), false, true});
+    fields.push_back({"Held", debug_panel::yes_no(slowing())});
+    fields.push_back({"TimeScale", setting("SimulationTime.TimeScale")});
+    fields.push_back({"ForceSimRate", setting("SimulationTime.ForceSimRate")});
+    fields.push_back({"MaxSimFps", setting("SimulationTime.MaxSimFps")});
     fields.push_back({"MEAT", {}, true});
     fields.push_back({"Meat", std::to_string(t.score)});
     fields.push_back({"Hits", std::format("{} ({})", t.hit_points, t.impacts)});

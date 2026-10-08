@@ -15,6 +15,8 @@ public:
     // it cannot now (a session, the settings not ready): then it runs at its own.
     bool set(float speed);
     void release();
+    // Whether it holds any of the three now.
+    bool held() const noexcept { return time_scale_.held() || sim_rate_.held() || max_sim_fps_.held(); }
 
 private:
     SettingHold time_scale_{"SimulationTime.TimeScale"};

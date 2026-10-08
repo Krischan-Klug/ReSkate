@@ -33,4 +33,6 @@ void set_enabled(bool enabled) noexcept;
 overlay::MeatFrame frame();
 // Any thread: everything the tracker knows now, for the debug panel (hall_of_meat_debug.h).
 Report report() noexcept;
+// Client thread: whether the slow motion holds the game's speed settings now (game_speed.h).
+bool slowing() noexcept;
 }

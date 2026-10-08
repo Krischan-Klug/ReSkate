@@ -216,6 +216,8 @@ Report report() noexcept {
     return result;
 }
 
+bool slowing() noexcept { return state().game_speed.held(); }
+
 overlay::MeatFrame frame() {
     auto& s = state();
     if (!enabled()) return {};

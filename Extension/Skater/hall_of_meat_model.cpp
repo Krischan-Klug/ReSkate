@@ -258,6 +258,7 @@ Report Tracker::report(std::uint64_t now) const noexcept {
     report.tally = tally();
     report.hit = impact_count_ > 0;
     if (report.hit) report.last = impacts_[last_impact_];
+    report.game_speed = game_speed(now);
     return report;
 }
 }
