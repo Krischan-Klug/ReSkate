@@ -1,6 +1,11 @@
 #include "Extension/Console/commands.h"
 #include "debug_panel.h"
+#include "write_watch.h"
+#include "Extension/Skater/local_skater_body.h"
 #include "Extension/UI/NativeHud/hud_corner.h"
+#include <Windows.h>
+#include <charconv>
+#include <format>
 
 namespace dingosdk::console {
 void register_debug_commands(Commands &registry) {
@@ -54,5 +59,52 @@ void register_debug_commands(Commands &registry) {
         out("HUD corner covered: " + std::string(hud_corner::name(chosen)) + ".");
     };
     registry.add(std::move(corner));
+
+    // Who writes a field, live (write_watch.h): a hardware watch on one address, each writer and each change logged.
+    auto target = argument("skaterstep|off|0x<address>|ghidra:0x<address>");
+    target.choices = {"skaterstep", "off"};
+    auto bytes = argument("bytes", Type::unsigned_integer, true);
+    bytes.choices = {"1", "2", "4", "8"};
+    auto watch = action("debugwatch", "Watch who writes an address (a hardware watch; each writer and each change is "
+        "logged): skaterstep = the local skater's physics step length; ghidra: takes an address as Ghidra shows it",
+        Group::console, {target, bytes});
+    watch.execution = Execution::local;
+    watch.inspect = [](const Model &) {
+        const auto s = write_watch::summary();
+        return State{true, s.armed ? std::format("{} at {:#x}: {} writes, {} writer(s)", s.name, s.address, s.writes, s.writers)
+                                   : std::string("off"), {}, {}, false};
+    };
+    watch.run = [](const Model &, const Values &args, const Output &out) {
+        const auto word = lower(std::get<std::string>(args[0]));
+        if (word == "off") {
+            write_watch::disarm();
+            out("Write watch off; the writers are in the log.");
+            return;
+        }
+        std::string error;
+        if (word == "skaterstep") {
+            if (write_watch::arm("skater step length", [] { return skater_body::step_length_address(); }, 4, error))
+                out("Watching the local skater's physics step length; writers and changes go to the log.");
+            else
+                out("error: " + error);
+            return;
+        }
+        const bool ghidra = word.starts_with("ghidra:");
+        auto text = std::string_view(word).substr(ghidra ? 7 : 0);
+        if (text.starts_with("0x")) text.remove_prefix(2);
+        std::uintptr_t address{};
+        if (text.empty() || std::from_chars(text.data(), text.data() + text.size(), address, 16).ec != std::errc{}) {
+            out("error: target must be skaterstep, off, 0x<address> or ghidra:0x<address>");
+            return;
+        }
+        // Ghidra shows Skate.exe at its preferred base; the game runs wherever Windows put it.
+        if (ghidra) address = address - 0x140000000 + reinterpret_cast<std::uintptr_t>(GetModuleHandleW(nullptr));
+        const auto size = args.size() > 1 ? static_cast<std::size_t>(std::get<std::uint64_t>(args[1])) : 4;
+        if (write_watch::arm(std::format("{:#x}", address), [address] { return address; }, size, error))
+            out(std::format("Watching {} bytes at {:#x}; writers and changes go to the log.", size, address));
+        else
+            out("error: " + error);
+    };
+    registry.add(std::move(watch));
 }
 } // namespace dingosdk::console

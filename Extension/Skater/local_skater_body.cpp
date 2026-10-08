@@ -93,6 +93,13 @@ void on_physics_step(std::uintptr_t rig, float seconds, bool wipeout) noexcept {
         if (const auto observer = slot.load(std::memory_order_acquire)) observer(step);
 }
 
+std::uintptr_t step_length_address() noexcept {
+    LocalSkater skater;
+    std::uintptr_t input{};
+    if (!current_local_skater(skater) || !memory::peek(skater.core + build::core_step_input_offset, input) || !input) return 0;
+    return input + build::step_input_length_offset;
+}
+
 bool read_contacts(const LocalSkater& skater, Contacts& result) noexcept {
     using namespace build;
     result = {};

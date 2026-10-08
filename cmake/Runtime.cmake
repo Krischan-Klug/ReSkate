@@ -15,6 +15,7 @@ add_library(dingosdk_runtime SHARED
     Extension/Debug/console_commands.cpp
     Extension/Debug/debug_panel.cpp
     Extension/Debug/debug_panel_model.cpp
+    Extension/Debug/write_watch.cpp
     Extension/Multiplayer/console_commands.cpp
     Extension/Multiplayer/Session/session.cpp
     Extension/Multiplayer/Session/session_view.cpp

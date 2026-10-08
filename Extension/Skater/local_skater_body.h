@@ -28,6 +28,10 @@ bool add_step_observer(StepObserver observer) noexcept;
 // No Bail's skeleton hook: every physics step of any skater's rig, `seconds` long.
 void on_physics_step(std::uintptr_t rig, float seconds, bool wipeout) noexcept;
 
+// Any thread: where the local skater's physics step length is kept now (a float, seconds of game
+// time), 0 while there is no local skater. For diagnostics: Extension/Debug/write_watch.h.
+std::uintptr_t step_length_address() noexcept;
+
 // Everything the latest physics step's contact processing kept of each body; false when it
 // is not readable. Exact in a step observer; read outside the physics step (from the client
 // tick, say), a step may be half written.

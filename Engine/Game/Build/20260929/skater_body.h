@@ -87,6 +87,12 @@ inline constexpr std::array<Fingerprint, 13> contracts{contacts_before_skeleton_
     bone_hit_kinds_contract,
     bone_contact_timer_contract, bone_contact_contract, sensitive_bone_contract, feet_on_board_contract,
     bone_velocity_state_contract, bone_velocity_contract};
+// The core's step input (published at core+0x3c8 by core_set_pose_input): +0x20 is the length of the
+// skater's physics step in seconds, copied to the context's +0x17ec every update (core_apply_step_input)
+// and handed to the contacts and the skeleton. Taken from the simulation rate when the skater spawns
+// or is teleported, never after (measured 2026-10-08).
+inline constexpr std::uintptr_t core_step_input_offset = 0x3c8;   // core
+inline constexpr std::uintptr_t step_input_length_offset = 0x20; // step input, float seconds
 inline constexpr std::uintptr_t contact_holder_offset = 0x2f10; // rig
 inline constexpr std::uintptr_t contact_struct_offset = 0x1040; // holder
 inline constexpr std::uintptr_t bone_records_offset = 0x5e0;     // contact struct

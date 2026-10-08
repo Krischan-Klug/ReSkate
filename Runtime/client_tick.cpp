@@ -9,6 +9,7 @@
 #include "Extension/Skater/camera_observer.h"
 #include "Extension/UI/NativeMenu/native_menu.h"
 #include "Extension/Debug/debug_panel.h"
+#include "Extension/Debug/write_watch.h"
 #include "Extension/Multiplayer/Hud/native_party.h"
 #include "Extension/Multiplayer/Hud/custom_nametags.h"
 #include "Extension/Multiplayer/developer_identity.h"
@@ -610,6 +611,7 @@ void update_model(std::uintptr_t client, TickState& frame) {
     }
     if (r.observer_failed) return; // Keep the bounded restore/telemetry path available after catalog failure.
     dingosdk::debug_panel::on_client_tick(); // every tick: some values last only a few (a landing)
+    dingosdk::write_watch::on_client_tick();
     dingosdk::skater_render::on_client_tick();
     dingosdk::hall_of_meat::on_client_tick();
     dingosdk::hud_corner::on_client_tick(); // after the features that cover it this tick
