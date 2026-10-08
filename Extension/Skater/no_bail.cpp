@@ -174,7 +174,7 @@ void skeleton_response(std::uintptr_t rig, float seconds, bool wipeout) {
     // Filter at this consumer, then let native constraints and recovery run.
     if (filter_requests(rig, &LocalSkater::rig)) wipeout = false;
     // The body's observers see the step as the skeleton will: a filtered wipeout never happened.
-    skater_body::on_physics_step(rig, wipeout);
+    skater_body::on_physics_step(rig, seconds, wipeout);
     protection().skeleton_original(rig, seconds, wipeout);
 }
 bool clear_contact_output(std::uintptr_t contacts) noexcept {

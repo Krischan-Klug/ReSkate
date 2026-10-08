@@ -16,6 +16,18 @@ void check(bool value, const char* message) { if (!value) throw std::runtime_err
 bool near(float a, float b) { return std::abs(a - b) < 1e-4f; }
 constexpr std::uint64_t t0 = 100000; // GetTickCount64() is never near 0
 
+// The game stepping its physics at `speed` (1 full speed, break_game_speed in slow motion): each
+// step as long in the game's time as the real time since the one before, times the speed.
+struct Game : Tracker {
+    float speed = 1.0f;
+    std::uint64_t last{};
+    bool step(std::uint64_t now, Step step, Summary* ended = nullptr) noexcept {
+        step.seconds = last && now > last ? static_cast<float>(now - last) / 1000.0f * speed : 0.0f;
+        last = now;
+        return Tracker::step(now, step, ended);
+    }
+};
+
 // A step of a skater in a ragdoll that touches nothing: a bail lying still.
 Step lying() {
     Step step;
@@ -74,13 +86,13 @@ Step moving(float speed) {
 }
 float seconds(std::uint64_t ms) { return static_cast<float>(ms) / 1000.0f; }
 // Steps `step` from `now` on, every 16 ms, for `ms`; returns the time after the last.
-std::uint64_t keep(Tracker& tracker, std::uint64_t now, std::uint64_t ms, const Step& step) {
+std::uint64_t keep(Game& tracker, std::uint64_t now, std::uint64_t ms, const Step& step) {
     for (const auto until = now + ms; now < until; now += 16) tracker.step(now, step);
     return now;
 }
 
 void impacts_count_only_during_a_bail() {
-    Tracker tracker;
+    Game tracker;
     check(!tracker.step(t0, riding_hit(Bone::neck1, 9.0f)), "a step without a bail ends nothing");
     check(tracker.view(t0).phase == Phase::riding, "nothing shows before a bail");
     const auto later = t0 + wipeout_after_impact_ms + 16;
@@ -92,7 +104,7 @@ void impacts_count_only_during_a_bail() {
 
 void the_hit_that_causes_the_wipeout_counts() {
     // A drop from height: the thigh hits, the wipeout comes a step later.
-    Tracker tracker;
+    Game tracker;
     tracker.step(t0, riding_hit(Bone::right_upleg, 35.0f));
     tracker.step(t0 + 16, riding_hit(Bone::right_upleg, 12.0f));
     tracker.step(t0 + 32, wipeout());
@@ -106,7 +118,7 @@ void the_hit_that_causes_the_wipeout_counts() {
 }
 
 void nothing_shows_until_a_bone_is_hurt() {
-    Tracker tracker;
+    Game tracker;
     tracker.step(t0, wipeout());
     tracker.step(t0 + 16, hit(Bone::spine, hit_speed - 0.5f));
     check(tracker.report(t0 + 16).phase == Phase::bailing && tracker.view(t0 + 16).phase == Phase::riding,
@@ -115,7 +127,7 @@ void nothing_shows_until_a_bone_is_hurt() {
     const auto view = tracker.view(t0 + 32);
     check(view.phase == Phase::bailing && near(view.alpha, 1.0f) && view.tally.impacts == 1,
         "the first bruise brings the skeleton and the card");
-    Tracker unhurt;
+    Game unhurt;
     unhurt.step(t0, hit(Bone::spine, hit_speed - 0.5f, true));
     Summary summary;
     check(unhurt.step(t0 + 16, standing_up(), &summary) && !summary.shown, "it ends unshown");
@@ -123,7 +135,7 @@ void nothing_shows_until_a_bone_is_hurt() {
 }
 
 void hard_hits_break_and_light_ones_bruise() {
-    Tracker tracker;
+    Game tracker;
     tracker.step(t0, hit(Bone::left_forearm, hit_speed + 0.1f, true));
     tracker.step(t0 + 16, hit(Bone::neck1, broken_speed + 0.1f));
     tracker.step(t0 + 32, hit(Bone::spine, hit_speed - 0.1f));
@@ -139,7 +151,7 @@ void hard_hits_break_and_light_ones_bruise() {
 void a_flump_starts_no_bail() {
     // Rolling along the ground and jumping off a height while rolling: a ragdoll slamming the ground,
     // which the game never wipes out.
-    Tracker tracker;
+    Game tracker;
     auto now = keep(tracker, t0, 1500, flying());
     for (int i = 0; i < 60; ++i, now += 16) {
         auto step = hit(i % 2 ? Bone::left_arm : Bone::spine, broken_speed + 5.0f);
@@ -151,7 +163,7 @@ void a_flump_starts_no_bail() {
 }
 
 void a_break_pulses_the_screen_edge() {
-    Tracker tracker;
+    Game tracker;
     tracker.step(t0, hit(Bone::left_hand, hit_speed + 1.0f, true));
     check(tracker.view(t0 + 16).break_pulse == 0.0f, "a bruise does not pulse");
     tracker.step(t0 + 16, hit(Bone::left_forearm, broken_speed + 1.0f));
@@ -168,7 +180,7 @@ void a_break_pulses_the_screen_edge() {
 }
 
 void a_break_slows_the_game_with_its_red_edge() {
-    Tracker tracker;
+    Game tracker;
     check(tracker.game_speed(t0) == 1.0f, "full speed without a bail");
     tracker.step(t0, hit(Bone::left_hand, hit_speed + 1.0f, true));
     check(tracker.game_speed(t0 + 16) == 1.0f, "a bruise keeps the speed");
@@ -201,7 +213,7 @@ void a_break_slows_the_game_with_its_red_edge() {
 void a_break_just_before_the_bail_counts_from_the_bail() {
     // The wipeout comes a few steps after the impact that broke the bone: the slow motion and the
     // red edge run from the step that saw the break, not from the impact.
-    Tracker tracker;
+    Game tracker;
     tracker.step(t0, riding_hit(Bone::right_upleg, broken_speed + 5.0f));
     const auto wiped_out = t0 + wipeout_after_impact_ms - 16;
     tracker.step(wiped_out, wipeout());
@@ -210,7 +222,7 @@ void a_break_just_before_the_bail_counts_from_the_bail() {
 }
 
 void the_board_and_bad_values_are_ignored() {
-    Tracker tracker;
+    Game tracker;
     auto step = wipeout();
     step.body.bodies[skater_body::index(Bone::board_root)].impact = 20.0f;
     step.body.bodies[skater_body::index(Bone::hips)].impact = std::nanf("");
@@ -220,7 +232,7 @@ void the_board_and_bad_values_are_ignored() {
 }
 
 void a_bail_lasts_until_the_skater_gets_up() {
-    Tracker tracker;
+    Game tracker;
     tracker.step(t0, hit(Bone::hips, hit_speed + 1.0f, true));
     // Rolling, then lying however long: the bail goes on, its card with it.
     auto now = keep(tracker, t0 + 16, 3000, hit(Bone::spine2, 2.0f));
@@ -246,7 +258,7 @@ void a_bail_lasts_until_the_skater_gets_up() {
 }
 
 void a_rest_ends_the_counting() {
-    Tracker tracker;
+    Game tracker;
     tracker.step(t0, hit(Bone::hips, hit_speed + 1.0f, true));
     auto now = keep(tracker, t0 + 16, 1000, moving(4.0f));
     const auto went_still = now;
@@ -275,14 +287,14 @@ void a_rest_ends_the_counting() {
     check(summary.tally.score == rested.score && near(summary.tally.seconds, seconds(went_still - t0)),
         "the bail ends as it was when the body came to rest");
     check(tracker.view(now + linger_ms + fade_ms / 2).tally.score == rested.score, "and fades out so");
-    Tracker unknown;
+    Game unknown;
     unknown.step(t0, hit(Bone::hips, hit_speed + 1.0f, true));
     check(unknown.report(keep(unknown, t0 + 16, 2000, lying())).phase == Phase::bailing, "an unknown speed never rests");
 }
 
 void a_fall_from_height_bails_at_its_wipeout() {
     // Thrown off the board from height: the ragdoll begins in the air, the wipeout comes with the impact.
-    Tracker tracker;
+    Game tracker;
     auto now = keep(tracker, t0, 500, flying(false));
     now = keep(tracker, now, 2000, flying());
     check(tracker.report(now).phase == Phase::riding, "a ragdoll in the air is no bail yet");
@@ -295,7 +307,7 @@ void a_fall_from_height_bails_at_its_wipeout() {
 }
 
 void a_stumble_without_a_ragdoll_ends() {
-    Tracker tracker;
+    Game tracker;
     auto stumble = wipeout();
     stumble.ragdoll = false;
     tracker.step(t0, stumble);
@@ -305,26 +317,27 @@ void a_stumble_without_a_ragdoll_ends() {
 }
 
 void an_unknown_skater_state_ends_nothing() {
-    Tracker tracker;
+    Game tracker;
     tracker.step(t0, hit(Bone::hips, hit_speed + 1.0f, true));
     const auto now = keep(tracker, t0 + 16, 2000, Step{}); // the skater state could not be read
     check(tracker.report(now).phase == Phase::bailing, "the bail goes on");
     check(tracker.step(now, standing_up()), "until the skater is seen standing");
-    Tracker riding;
+    Game riding;
     riding.step(t0, Step{});
     check(riding.report(t0).phase == Phase::riding, "nor does it start one");
 }
 
 void a_lost_skater_ends_the_bail() {
-    Tracker tracker;
+    Game tracker;
     check(!tracker.lose(t0), "no bail, nothing to end");
     tracker.step(t0, hit(Bone::hips, hit_speed + 1.0f, true));
+    tracker.step(keep(tracker, t0 + 16, 480, lying()) + 4, lying()); // the last step at t0 + 500
     Summary summary;
     check(tracker.lose(t0 + 500, &summary) && near(summary.tally.seconds, 0.5f) && summary.shown, "a respawn ends the bail");
     check(tracker.view(t0 + 500).phase == Phase::getting_up, "and it fades out");
     check(!tracker.lose(t0 + 516), "once");
     // A teleport in mid-air: the flight before it is not the next bail's.
-    Tracker teleported;
+    Game teleported;
     const auto now = keep(teleported, t0, 1000, flying(false));
     teleported.lose(now);
     teleported.step(now + 16, hit(Bone::hips, hit_speed + 1.0f, true));
@@ -332,7 +345,7 @@ void a_lost_skater_ends_the_bail() {
 }
 
 void a_reading_clock_behind_the_physics_one_is_harmless() {
-    Tracker tracker;
+    Game tracker;
     tracker.step(t0, hit(Bone::neck, hit_speed + 0.5f, true));
     const auto view = tracker.view(t0 - 5);
     check(view.phase == Phase::bailing && near(view.alpha, 1.0f) && near(view.flashes[skater_body::index(Bone::neck)], 1.0f),
@@ -340,7 +353,7 @@ void a_reading_clock_behind_the_physics_one_is_harmless() {
 }
 
 void one_contact_is_one_impact() {
-    Tracker tracker;
+    Game tracker;
     constexpr float light = hit_speed + 0.5f, harder = broken_speed - 1.0f;
     tracker.step(t0, hit(Bone::spine, light, true));
     tracker.step(t0 + 16, hit(Bone::spine, harder)); // the same contact, harder
@@ -355,7 +368,7 @@ void one_contact_is_one_impact() {
 }
 
 void the_meat_adds_up() {
-    Tracker tracker;
+    Game tracker;
     constexpr float breaks = broken_speed + 1.0f, bruises = hit_speed + 1.0f;
     tracker.step(t0, hit(Bone::neck1, breaks, true)); // the head breaks
     tracker.step(t0 + 16, hit(Bone::left_hand, bruises)); // a hand is bruised
@@ -368,7 +381,7 @@ void the_meat_adds_up() {
 }
 
 void a_vehicle_adds_half_again() {
-    Tracker tracker;
+    Game tracker;
     auto car = hit(Bone::spine, 10.0f, true);
     car.body.bodies[skater_body::index(Bone::spine)].hit.vehicle = true;
     tracker.step(t0, car);
@@ -381,7 +394,7 @@ void a_vehicle_adds_half_again() {
 }
 
 void sliding_along_the_ground_is_road_rash() {
-    Tracker tracker;
+    Game tracker;
     tracker.step(t0, slide(Bone::hips, 5.0f, true));
     auto now = t0;
     for (int i = 0; i < 50; ++i) tracker.step(now += 20, slide(Bone::hips, 5.0f)); // a second at 5 m/s
@@ -392,7 +405,7 @@ void sliding_along_the_ground_is_road_rash() {
     check(view.tally.score == view.tally.scrape_points + view.tally.time_points && view.tally.impacts == 0, "it scores without a hit");
 
     // The whole body slides as one: the road rash is how far it went, not the bodies' sum.
-    Tracker body;
+    Game body;
     auto all = slide(Bone::hips, 4.0f, true);
     for (const auto bone : {Bone::spine, Bone::spine1, Bone::left_upleg})
         all.body.bodies[skater_body::index(bone)] = all.body.bodies[skater_body::index(Bone::hips)];
@@ -403,7 +416,7 @@ void sliding_along_the_ground_is_road_rash() {
     const auto tally = body.view(now).tally;
     check(std::abs(tally.scraped - 4.8f) < 1e-3f, "the average of the scraping bodies' slides, over a second");
 
-    Tracker board;
+    Game board;
     auto on_board = slide(Bone::spine, 5.0f, true);
     auto& contact = on_board.body.bodies[skater_body::index(Bone::spine)];
     contact.hit = {};
@@ -416,13 +429,14 @@ void sliding_along_the_ground_is_road_rash() {
 }
 
 void the_report_follows_the_bail() {
-    Tracker tracker;
+    Game tracker;
     check(tracker.report(t0).phase == Phase::riding && !tracker.report(t0).hit, "riding, no hit");
     tracker.step(t0, hit(Bone::left_hand, hit_speed + 1.0f, true));
+    tracker.step(keep(tracker, t0 + 16, 480, lying()) + 4, lying()); // the last step at t0 + 500
     auto report = tracker.report(t0 + 500);
     check(report.phase == Phase::bailing && near(report.tally.seconds, 0.5f), "bailing");
     check(report.hit && report.last.bone == skater_body::index(Bone::left_hand) && report.tally.impacts == 1, "the hand's hit");
-    const auto now = keep(tracker, t0 + 16, 1000, lying());
+    const auto now = keep(tracker, t0 + 516, 1000, lying());
     tracker.step(now, standing_up());
     report = tracker.report(now + 100);
     check(report.phase == Phase::getting_up && near(report.tally.seconds, seconds(now - t0)), "getting up, with how long the bail lasted");
@@ -431,21 +445,20 @@ void the_report_follows_the_bail() {
 
 void airtime_is_the_bails_time_in_the_air() {
     // A fall from height on the board: 4 s in the air, the wipeout a step after the impact.
-    Tracker tracker;
+    Game tracker;
     std::uint64_t now = t0;
     for (; now <= t0 + 4000; now += 16) tracker.step(now, flying(false));
     tracker.step(now, standing_up());                       // the touch-down
     tracker.step(now + 16, hit(Bone::hips, hit_speed, true)); // the impact's wipeout
     tracker.step(now + 32, flying());                       // the ragdoll bounces: +16 ms
     tracker.step(now + 48, lying());                        // and lies
-    tracker.step(now + 2048, flying());                     // after a pause: longest_step_ms at most
-    check(std::abs(tracker.view(now + 2048).tally.airtime - (4000 + 16 + longest_step_ms) / 1000.0f) < 1e-4f,
+    check(std::abs(tracker.view(now + 48).tally.airtime - (4000 + 16) / 1000.0f) < 1e-4f,
         "the flight before the wipeout and the bail's own flights count");
-    const auto air = tracker.view(now + 2048).tally;
+    const auto air = tracker.view(now + 48).tally;
     check(air.airtime_points == static_cast<int>(air.airtime * points_per_air_second + 0.5f), "airtime scores by the second");
 
     // A clean landing, then a bail later on the ground: that flight is not the bail's.
-    Tracker later;
+    Game later;
     for (now = t0; now <= t0 + 1000; now += 16) later.step(now, flying(false));
     later.step(now, standing_up());
     later.step(now + wipeout_after_impact_ms + 16, hit(Bone::hips, hit_speed, true));
@@ -454,7 +467,7 @@ void airtime_is_the_bails_time_in_the_air() {
 
 void a_bail_lasts_through_its_flights() {
     // The first impact throws the body off a ledge: seconds in the air, then the second one.
-    Tracker tracker;
+    Game tracker;
     auto now = keep(tracker, t0, 1000, flying(false));
     tracker.step(now, hit(Bone::hips, broken_speed + 1.0f, true));
     const auto thrown = now;
@@ -482,10 +495,11 @@ void the_card_shows_the_bail() {
             "white to be tinted, from a texture");
         check(added(image.key), "each under its own key");
     }
-    Tracker tracker;
+    Game tracker;
     check(score_card(tracker.view(t0), {}).opacity == 0 && score_card(tracker.view(t0), {}).rows.empty(), "no card while riding");
     tracker.step(t0, hit(Bone::neck1, broken_speed + 1.0f, true)); // the head breaks
     tracker.step(t0 + 16, hit(Bone::left_hand, hit_speed + 1.0f));
+    tracker.step(keep(tracker, t0 + 32, 1456, lying()) + 12, lying()); // the last step at t0 + 1500
     const auto view = tracker.view(t0 + 1500);
     auto card = score_card(view, standing(0, view.tally.score));
     check(near(card.opacity, 1.0f) && card.total == view.tally.score && card.title == "Hall of Meat" && added(card.logo) &&
@@ -506,7 +520,7 @@ void the_card_shows_the_bail() {
     check(near(score_card(tracker.view(t0 + 1500 + linger_ms + fade_ms / 2), {}).opacity, 0.5f), "then fades");
 
     // A big one: off a roof for 3.5 s, five bones broken at 20 m/s, a slide of 5 m.
-    Tracker big;
+    Game big;
     auto falling = flying(false);
     falling.velocity = game::Vec3{0, -10, 0};
     auto now = keep(big, t0, 3500, falling);
@@ -532,7 +546,7 @@ void the_card_shows_the_bail() {
 
 void the_fall_and_the_top_speed_score() {
     // Off a roof on the board: falling at 10 m/s for 2 s, then the impact's wipeout at 20 m/s.
-    Tracker tracker;
+    Game tracker;
     auto falling = flying(false);
     falling.velocity = game::Vec3{3, -10, 0};
     auto now = keep(tracker, t0, 2000, falling);
@@ -552,7 +566,7 @@ void the_fall_and_the_top_speed_score() {
 }
 
 void the_body_turning_over_scores() {
-    Tracker tracker;
+    Game tracker;
     auto spinning = hit(Bone::hips, hit_speed + 1.0f, true);
     spinning.spin = -1.0f; // not a speed: nothing
     tracker.step(t0, spinning);
@@ -569,6 +583,30 @@ void the_body_turning_over_scores() {
     const auto rested = tracker.view(now).tally.rotations;
     now = keep(tracker, now, 1000, tumbling); // getting up
     check(near(tracker.view(now).tally.rotations, rested), "after the rest nothing turns any more");
+}
+
+void a_bail_runs_on_the_games_clock() {
+    // A break slows the game down: its physics steps as often each real second as before, each the
+    // shorter. In play on 2026-10-08 the ragdoll came later than ragdoll_wait_ms in real time, so the
+    // bail ended in mid-air and the next impact began another: the bones hurt before were gone.
+    Game slow;
+    slow.speed = break_game_speed;
+    auto thrown = hit(Bone::left_leg, hit_speed + 1.0f, true);
+    thrown.ragdoll = false; // the bail's first part: off the board, the ragdoll still to come
+    slow.step(t0, thrown);
+    auto falling = flying(false);
+    falling.velocity = game::Vec3{0, -10, 0};
+    auto now = keep(slow, t0 + 16, 1000, falling); // a real second, under a third of the game's
+    check(slow.report(now).phase == Phase::bailing, "the ragdoll still has the game's moment to begin");
+    falling.ragdoll = true;
+    now = keep(slow, now, 1000, falling);
+    slow.step(now, hit(Bone::neck1, broken_speed + 1.0f, true)); // a further impact, wiping out again
+    const auto view = slow.view(now);
+    check(view.phase == Phase::bailing && near(view.alpha, 1.0f) && view.tally.impacts == 2 &&
+              view.injuries[skater_body::index(Bone::left_leg)] == Injury::hit,
+        "one bail, the skeleton whole: the leg bruised before is still bruised");
+    check(std::abs(view.tally.airtime - 0.6f) < 0.01f && std::abs(view.tally.fallen - 6.0f) < 0.1f,
+        "the airtime and the fall are the game's: two real seconds at 0.3");
 }
 
 void a_bail_sets_a_best_only_by_beating_it() {
@@ -605,6 +643,7 @@ int main() {
         a_bail_lasts_through_its_flights();
         the_fall_and_the_top_speed_score();
         the_body_turning_over_scores();
+        a_bail_runs_on_the_games_clock();
         a_bail_sets_a_best_only_by_beating_it();
         the_card_shows_the_bail();
     } catch (const std::exception& error) {

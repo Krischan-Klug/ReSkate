@@ -58,6 +58,7 @@ void observe_step(const skater_body::Step& body_step) noexcept {
     if (!s.enabled.load(std::memory_order_acquire)) return;
     const auto now = GetTickCount64();
     Step step;
+    step.seconds = body_step.seconds;
     step.wipeout = body_step.wipeout;
     skater_state::SkaterState skater;
     if (skater_state::read(body_step.skater, skater)) {

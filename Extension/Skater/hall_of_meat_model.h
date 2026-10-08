@@ -23,11 +23,17 @@
 // ends exactly once, when the skater stands up on foot; skate. may put them back on the board
 // a moment later. The bail shows only once it has hurt a bone: a fall that leaves the skater
 // unbruised shows nothing.
+//
+// Two clocks. The bail runs on the game's: its steps' own lengths added up, so in slow motion
+// (a break: hall_of_meat.h) the moment the ragdoll has to begin, the rest, the impacts and every
+// stat still measure what the body did. What the player sees runs on the real one: a hit's
+// flash, a break's effect, the linger and the fade after the bail.
 namespace dingosdk::hall_of_meat {
 using skater_body::Bone;
 
 // One physics step of the local skater.
 struct Step {
+    float seconds{}; // how long the step simulated, in the game's time (skater_body.h Step)
     bool wipeout{};  // the step asks for a wipeout
     bool airborne{}; // the skater is in the air, on the board or off it (skater_state.h)
     // The body is a ragdoll (skater_state.h Mode::ragdoll); empty when the skater state could not
@@ -79,10 +85,6 @@ inline constexpr float break_game_speed = 0.3f;
 // this are one impact, as hard as its hardest step.
 inline constexpr std::uint64_t impact_gap_ms = 200;
 inline constexpr std::size_t max_impacts = 64;
-// Airtime adds up the time between physics steps in the air: the flight a bail starts from
-// and every flight of the bail after it. A longer gap between steps (a pause) adds this much
-// at most.
-inline constexpr std::uint64_t longest_step_ms = 100;
 // The game reports the wipeout of an impact a few physics steps after it (0 to 2 in the logs
 // of 2026-10-05; a drop from height on 2026-10-06 hit the right thigh at 35 m/s a step before
 // its wipeout): a bail takes the flight and the hits of this long before it starts.
@@ -209,8 +211,8 @@ struct Summary {
 
 class Tracker {
 public:
-    // One physics step at `now` (milliseconds). True when this step ended a bail; `ended` then
-    // receives it.
+    // One physics step, at `now` in real time (milliseconds). True when this step ended a bail;
+    // `ended` then receives it.
     bool step(std::uint64_t now, const Step& step, Summary* ended = nullptr) noexcept;
     // The skater is gone (a respawn, a teleport, a map change): a bail ends now. True when one did.
     bool lose(std::uint64_t now, Summary* ended = nullptr) noexcept;
@@ -221,27 +223,31 @@ public:
     void reset() noexcept { *this = {}; }
 
 private:
+    // Times on the game's clock (played_) are milliseconds of its time, as doubles; real times are
+    // GetTickCount64()'s milliseconds, never 0.
+    //
     // A bone's hardest hit of the last wipeout_after_impact_ms while riding, which a bail takes.
     struct Lead {
         float speed{};
         bool vehicle{};
-        std::uint64_t at{};
+        std::optional<double> at; // the game's clock
     };
     struct BoneState {
-        float peak{};           // the hardest hit this bail
-        std::uint64_t hit_at{}; // its last step with a hit
-        std::size_t impact{};   // which impact that step belonged to
-        float scraped{};        // metres it slid
+        float peak{};                 // the hardest hit this bail
+        std::optional<double> hit_at; // its last step with a hit, on the game's clock
+        std::uint64_t flashed_at{};   // and when that hit showed, in real time; 0 never
+        std::size_t impact{};         // which impact that step belonged to
+        float scraped{};              // metres it slid
         Lead lead;
     };
     void begin(std::uint64_t now) noexcept;
-    void rest(std::uint64_t now, std::optional<float> speed) noexcept;
-    void count(std::uint64_t now, const Step& step, std::uint64_t step_ms) noexcept;
-    void hit(std::size_t bone, float speed, bool vehicle, std::uint64_t at) noexcept;
+    void rest(std::optional<float> speed) noexcept;
+    void count(std::uint64_t now, const Step& step, double step_ms) noexcept;
+    void hit(std::size_t bone, float speed, bool vehicle, double at, std::uint64_t now) noexcept;
     bool end(std::uint64_t now, Summary* ended) noexcept;
     Phase phase(std::uint64_t now) const noexcept;
-    std::uint64_t bail_ms(std::uint64_t now) const noexcept;
-    Tally tally(std::uint64_t now) const noexcept;
+    double bail_ms() const noexcept;
+    Tally tally() const noexcept;
     Injury injury_of(const BoneState& bone) const noexcept;
 
     Phase phase_{};    // riding, bailing or down; getting_up is the linger and the fade after a bail's end
@@ -251,13 +257,15 @@ private:
     std::array<std::uint64_t, skater_body::count> breaks_seen_at_{}; // the steps that saw breaks, oldest first
     std::size_t breaks_seen_{};                                       // how many of them
     float break_effect(std::uint64_t now) const noexcept; // 0 to 1
-    std::uint64_t started_{}, ended_{}, stepped_{};
-    std::uint64_t still_since_{}; // bailing: when the body last went slower than still_speed; 0 while faster
-    std::uint64_t rested_at_{};   // down: when the body came to rest, and the bail's time stopped
-    std::uint64_t flight_ms_{};  // while riding: the last flight, which a bail takes over
-    float flight_fallen_{};      // and how far it went down
-    std::uint64_t landed_{};     // when it touched down; 0 while in the air
-    std::uint64_t airtime_ms_{};
+    double played_{};     // the game's clock: every step's length added up
+    double started_{};    // the game's clock at the bail's wipeout
+    std::uint64_t ended_{}; // real time: when the bail ended, for its linger and fade; 0 none yet
+    std::optional<double> still_since_; // bailing: when the body last went slower than still_speed
+    std::optional<double> stopped_at_;  // when the bail's time stopped: the body came to rest, or the bail ended
+    double flight_ms_{};             // while riding: the last flight, which a bail takes over
+    float flight_fallen_{};          // and how far it went down
+    std::optional<double> landed_;   // when it touched down; empty while in the air
+    double airtime_ms_{};
     float fallen_{};    // metres the body went down
     float top_speed_{}; // metres per second
     float turned_{};    // radians the body turned, any way round
