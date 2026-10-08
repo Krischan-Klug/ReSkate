@@ -20,13 +20,16 @@
 #include "Extension/Progression/fixed_stop_entitlement_provider.h"
 #include "Extension/Progression/mission_progression_override.h"
 #include "Extension/Progression/neighborhood_unlock_override.h"
+#include "Extension/Rendering/local_skater_render.h"
 #include "Extension/Settings/gameplay_settings_override.h"
 #include "Extension/Settings/named_settings.h"
 #include "Extension/Skater/ai_skaters.h"
 #include "Extension/Skater/client_source_spawn.h"
+#include "Extension/Skater/hall_of_meat.h"
 #include "Extension/Skater/skater_slot_override.h"
 #include "Extension/Throwdowns/native_throwdowns.h"
 #include "Extension/Trainer/trainer.h"
+#include "Extension/UI/NativeHud/hud_corner.h"
 #include "Extension/World/level_loading.h"
 #include "Extension/World/loading_screen.h"
 #include <dxgi.h>
@@ -607,6 +610,9 @@ void update_model(std::uintptr_t client, TickState& frame) {
     }
     if (r.observer_failed) return; // Keep the bounded restore/telemetry path available after catalog failure.
     dingosdk::debug_panel::on_client_tick(); // every tick: some values last only a few (a landing)
+    dingosdk::skater_render::on_client_tick();
+    dingosdk::hall_of_meat::on_client_tick();
+    dingosdk::hud_corner::on_client_tick(); // after the features that cover it this tick
     if (!has_request && now < r.next_model && state == r.previous_state) return;
     r.next_model = now + 500;
     DINGO_PROFILE_ZONE("tick/update_model/world model (500 ms)");
@@ -614,6 +620,7 @@ void update_model(std::uintptr_t client, TickState& frame) {
     r.multiplayer_map = description.level.empty() ? std::string{} : description.level + "|" + description.lm_level;
     const auto& current_level = description.lm_level.empty() ? description.level : description.lm_level;
     dingosdk::live_mods::set_current_level(current_level);
+    dingosdk::hall_of_meat::set_level(current_level);
     // A live mod apply hands over the destinations its mods declare. A map
     // being played that is no longer among them (its mod disabled or deleted)
     // cannot stay loaded: the player goes to San Van.

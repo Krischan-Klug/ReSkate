@@ -1,6 +1,7 @@
 #include "Extension/Console/commands.h"
 #include "Extension/Profile/local_profile_runtime.h"
 #include "ai_skaters.h"
+#include "hall_of_meat.h"
 #include <format>
 namespace dingosdk::console {
 void register_movement_commands(Commands &registry) {
@@ -53,6 +54,16 @@ void register_movement_commands(Commands &registry) {
         };
         registry.add(std::move(entry));
     }
+    auto meat = variable("hallofmeat", "Hall of Meat: the bones the skater hurt when they bail, bruised ones yellow and broken ones red, and the bail's Meat score",
+        Group::movement, argument("on|off", Type::boolean));
+    meat.execution = Execution::local;
+    meat.inspect = [](const Model &) { return boolean_state(true, hall_of_meat::enabled()); };
+    meat.run = [](const Model &, const Values &args, const Output &out) {
+        const bool on = std::get<bool>(args[0]);
+        hall_of_meat::set_enabled(on);
+        out(on ? "Hall of Meat on." : "Hall of Meat off.");
+    };
+    registry.add(std::move(meat));
     auto speed = argument("speed", Type::number);
     speed.choices = {"0.6", "3", "5", "15", "60", "300", "1500"};
     auto flight = variable("flyspeed", "Free-flight speed in world units per second", Group::movement, speed);

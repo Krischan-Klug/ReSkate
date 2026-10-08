@@ -12,12 +12,16 @@
 #include "Engine/Game/Multiplayer/session_model.h"
 #include "Engine/Game/UI/menu_scale.h"
 #include "Engine/Game/Skater/first_person_spring.h"
+#include "Engine/Game/Skater/skater_body.h"
 
 #include "Engine/Core/Console/console_entry.h"
+#include "Engine/Resource/image_region.h"
 
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -105,6 +109,7 @@ struct DebugModel {
     std::string forward_velocity_unavailable = "Waiting for local controls.";
     std::string up_velocity_unavailable = "Waiting for local controls.";
     bool no_bail = false, no_bail_available = false, no_bail_active = false;
+    bool hall_of_meat = false, hall_of_meat_available = false; // Extension/Skater/hall_of_meat.h
     std::uint64_t noclip_velocity_updates = 0, noclip_motion_updates = 0;
     std::uint64_t forward_velocity_updates = 0;
     std::uint64_t up_velocity_updates = 0;
@@ -332,6 +337,83 @@ struct Nametags {
 };
 using NametagFeed = Nametags (*)();
 void set_nametag_feed(NametagFeed) noexcept;
+// skate.'s own skeleton mesh posed for one frame (Engine/Game/Skater/skater_skeleton.h), in world
+// space with the camera to see it from: any feature's to show (skeleton_overlay.cpp).
+struct SkeletonFrame {
+    std::array<float, 16> camera{}; // world matrix: right, up, back, position rows
+    float vertical_fov{};
+    std::vector<std::array<float, 3>> positions, normals;        // world space, one per vertex
+    std::shared_ptr<const std::vector<std::uint32_t>> triangles; // vertex indices, three a triangle
+    std::shared_ptr<const std::vector<std::uint8_t>> parts;      // each vertex's body (skater_body.h)
+};
+// Images out of the installed game's data (Engine/Vfs/game_textures.h), for any feature to draw
+// in the overlay by key (overlay_images.cpp). Read in the background as they are added; drawn
+// once the overlay's next atlas holds them. A key already added keeps its first image.
+enum class GameImageColours : std::uint8_t {
+    original,
+    silhouette, // white with the texture's own alpha, to be drawn in any colour
+    brightness, // white with the texture's brightness as alpha: light marks on black (scratches), in any colour
+};
+struct GameImage {
+    std::string key;
+    std::string toc, bundle, name; // the texture: superbundle TOC, bundle, resource name
+    std::uint32_t side{};          // the texture fitted into a side x side square, its aspect kept
+    GameImageColours colours{};
+    frostbite::ImageRegion region{}; // the part of the texture kept: the picture
+    // A shape's: the part of the picture a box is laid on, the rest drawn around it (a brush
+    // stroke's bar, its splatter beyond), and how much of each edge a panel keeps unstretched
+    // (nine-slice), both as fractions of the picture's width and height.
+    frostbite::ImageRegion body{};
+    float slice{};
+};
+void add_game_images(std::vector<GameImage> images);
+// A result card for any feature (score_card_overlay.cpp), laid out like skate. 3's Hall of Meat
+// in skate.'s own colours: a row per stat, then the logo, the title and the total, in the bottom
+// left corner where skate.'s own HUD shows (Extension/UI/NativeHud/hud_corner.h covers that).
+// Icons, the logo and the skin are game images' keys (add_game_images), white and tinted as they
+// are drawn. A row new on the card fades in, so a card can grow as its stats come.
+struct ScoreCardRow {
+    std::string key;           // the same row from frame to frame
+    std::string icon;          // empty for none
+    std::string value;         // what was measured, as shown: "6.2 s"
+    std::optional<int> points; // what it scored; none for a stat that scores nothing
+};
+// The shapes the card is drawn with; one empty or not loaded draws a plain tile instead, or nothing.
+struct ScoreCardSkin {
+    std::string row;       // a stat's bar, laid under its icon, value and points (its body on them)
+    std::string panel;     // the logo's, the title's and the total's, nine-sliced
+    std::string scratches; // over the panel
+    std::string underline; // under the total
+};
+struct ScoreCard {
+    float opacity{}; // 0: no card
+    ScoreCardSkin skin;
+    std::vector<ScoreCardRow> rows;
+    std::string logo;
+    // How far down the logo the title starts, as a fraction of its height: less than 1 under a logo
+    // whose lower edge arches (the THRASHER wordmark), so the title sits in the arch.
+    float logo_clear{1};
+    std::string title;
+    int total{};       // counts up to its value as it changes
+    std::string badge; // beside the title, e.g. "NEW BEST" or "BEST 12,345"; empty for none
+    bool highlight{};  // the badge marks a record
+};
+// Hall of Meat: from the local skater's bail until they get up, the bones it hurt over the world,
+// each coloured by how hard it was hit, and the bail's score card. Empty parts draw nothing.
+enum class MeatInjury : std::uint8_t { none, hit, broken };
+struct MeatSkeleton {
+    SkeletonFrame frame;
+    float alpha{}; // fades the whole skeleton out
+    std::array<MeatInjury, skater_body::count> injuries{}; // each body's
+    std::array<float, skater_body::count> flashes{};       // 1 the moment it is hit, falling to 0
+};
+struct MeatFrame {
+    MeatSkeleton skeleton;
+    ScoreCard card;
+    float break_pulse{}; // the screen's red edge when a bone breaks, 0 to 1
+};
+using MeatFeed = MeatFrame (*)(); // every presented frame
+void set_hall_of_meat_feed(MeatFeed) noexcept;
 // The debug panel (Extension/Debug/debug_panel.h): one source's live values in the bottom
 // right corner. A field flashes when its value changes.
 struct DebugField {

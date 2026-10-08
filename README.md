@@ -21,6 +21,11 @@ the launcher, the runtime that loads into the game, and the dedicated server.
   - World: time of day, population, district levels, rotating parks.
   - The **Park Editor**: place, move and save objects with freecam, snapping and undo.
   - Skater options: first person, movement, boosts, noclip.
+  - **Hall of Meat**: bail and see the bones you hurt, bruised ones yellow and broken ones red, with a
+    skate. 3 style Meat card drawn with skate.'s own brush strokes, in the place of the game's own HUD in
+    the bottom left corner: the bail's time, hits (head hits double, vehicles half again), broken bones,
+    road rash, airtime, fall, top speed and rotations, each scoring. A bone breaking flashes the screen's
+    edges red and, in single player, slows the game down a moment.
   - Progression, controls, graphics and multiplayer settings.
 - **Mods.**
   - Drop a mod in `Mods/` and it is merged into the game at launch. Mods can add custom maps, loading
