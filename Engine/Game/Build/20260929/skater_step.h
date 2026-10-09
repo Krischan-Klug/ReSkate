@@ -23,8 +23,8 @@ inline constexpr std::uintptr_t core_state_offset = 0x3b0; // the current state 
 inline constexpr std::uintptr_t state_id_slot = 0x40, state_name_slot = 0x48;
 inline constexpr std::uintptr_t core_ctx_offset = 0x3c0;
 inline constexpr std::uint32_t ctx_size = 0x19e0;
-// SkaterCtx, read by the state ticks: the step's length (s), and a position and velocity (vec4) the air
-// state starts its ballistic flight from (static reading, the debug tool's skater.motion probe checks it).
+// SkaterCtx, the step's input: its length (always 1/60 s, measured), and the skater's position (m, y up) and
+// velocity (vec4; the backward difference of the position), measured with the debug tool on 2026-10-09.
 inline constexpr std::uintptr_t ctx_step_seconds_offset = 0x17ec;
 inline constexpr std::uintptr_t ctx_position_offset = 0x4e0, ctx_velocity_offset = 0x4f0;
 inline constexpr std::uintptr_t core_controller_offset = 0x3d8; // direction +0x700, target +0x730
