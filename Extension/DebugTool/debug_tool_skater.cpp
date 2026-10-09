@@ -243,9 +243,17 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
         };
         write_record(3, core, -1, once, std::size(once));
     }
-    if (kind == 1) {
-        const Section before[]{{tag("CTX_"), ctx, step::ctx_size}, {tag("STAT"), state, state_bytes}};
-        write_record(kind, core, id, before, std::size(before));
+    if (kind == 1 || kind == 6) {
+        // Around the state tick (1 before, 6 after): what the tick reads and writes, to test a state on its own.
+        const Section tick[]{
+            {tag("CTX_"), ctx, step::ctx_size},
+            {tag("STAT"), state, state_bytes},
+            {tag("RIG_"), pointer_at(core + step::core_rig_offset), step::rig_size},
+            {tag("CTRL"), pointer_at(core + step::core_controller_offset), step::controller_size},
+            {tag("SURF"), pointer_at(core + step::core_surface_offset), step::surface_size},
+            {tag("TRAJ"), pointer_at(core + step::core_trajectory_offset), step::trajectory_size},
+        };
+        write_record(kind, core, id, tick, std::size(tick));
         return;
     }
     const Section after[]{
@@ -337,6 +345,10 @@ void record_choice(std::uint32_t kind, std::uintptr_t core) {
 void __fastcall pre_tick_hook(std::uintptr_t core) {
     observe(1, core);
     pre_tick_original(core);
+    if (step_probe.enabled.load(std::memory_order_relaxed) && core == local_core()) try {
+        const auto state = pointer_at(core + step::core_state_offset);
+        record_step(6, core, state, state_id(state), pointer_at(core + step::core_ctx_offset));
+    } catch (...) {}
 }
 void __fastcall physics_step_hook(std::uintptr_t core) {
     physics_step_original(core);
