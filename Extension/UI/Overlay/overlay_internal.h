@@ -198,6 +198,7 @@ struct State {
     std::string console_history_draft;
     std::uint64_t console_log_sequence = 0;
     bool console_autoscroll = true;
+    bool console_debug_tab = false; // the DEBUG tab (Extension/DebugTool) instead of the log
     bool console_scroll_to_bottom = false;
     bool console_force_scroll = false;
     bool console_was_at_bottom = true;

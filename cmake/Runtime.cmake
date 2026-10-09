@@ -120,6 +120,9 @@ add_library(dingosdk_runtime SHARED
     Extension/HallOfMeat/hall_of_meat_skater.cpp
     Extension/HallOfMeat/hall_of_meat_skeleton.cpp
     Extension/HallOfMeat/hall_of_meat_slow_motion.cpp
+    Extension/DebugTool/debug_tool.cpp
+    Extension/DebugTool/debug_tool_commands.cpp
+    Extension/DebugTool/debug_tool_skater.cpp
     Extension/Trainer/trainer.cpp
     Extension/Trainer/trainer_presets.cpp
     Extension/Trainer/trainer_jump.cpp
