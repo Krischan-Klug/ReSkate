@@ -91,6 +91,14 @@ std::uint64_t keep(Game& tracker, std::uint64_t now, std::uint64_t ms, const Ste
     return now;
 }
 
+void nothing_counts_before_the_first_bail() {
+    // Riding about after the map loaded: the game's clock runs, but there is no bail to time.
+    Game tracker;
+    const auto now = keep(tracker, t0, 30000, Step{});
+    const auto report = tracker.report(now);
+    check(report.phase == Phase::riding && report.tally.seconds == 0 && report.tally.score == 0, "no time and no Meat without a bail");
+}
+
 void impacts_count_only_during_a_bail() {
     Game tracker;
     check(!tracker.step(t0, riding_hit(Bone::neck1, 9.0f)), "a step without a bail ends nothing");
@@ -618,6 +626,7 @@ void a_bail_sets_a_best_only_by_beating_it() {
 
 int main() {
     try {
+        nothing_counts_before_the_first_bail();
         impacts_count_only_during_a_bail();
         the_hit_that_causes_the_wipeout_counts();
         nothing_shows_until_a_bone_is_hurt();

@@ -169,7 +169,9 @@ bool Tracker::end(std::uint64_t now, Summary* ended) noexcept {
 }
 
 // The bail's time, on the game's clock: until the body came to rest, or the bail ended, or the latest step.
+// Riding with no bail stopped yet there has been no bail: no time.
 double Tracker::bail_ms() const noexcept {
+    if (!stopped_at_ && phase_ == Phase::riding) return 0.0;
     return std::max(0.0, (stopped_at_ ? *stopped_at_ : played_) - started_);
 }
 
