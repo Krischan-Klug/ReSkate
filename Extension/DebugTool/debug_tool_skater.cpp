@@ -24,7 +24,7 @@ namespace tuning = addr::physics_tuning;
 
 using Step = void(__fastcall*)(std::uintptr_t core);
 std::uintptr_t image_base;
-Step pre_tick_original, physics_step_original;
+Step pre_tick_original, physics_step_original, advance_state_original;
 std::atomic<bool> hooked;
 
 std::uintptr_t pointer_at(std::uintptr_t address) {
@@ -117,7 +117,7 @@ std::array<Probe, 3> probes{{
      "Position, velocity and speed from the skater's ctx, ten times per second.",
      {}, [] { return hooked.load(); }, nullptr, &motion_status},
     {"skater.step", "skater", "Step recording",
-     "Every physics step: core, ctx, rig, state, controller and outputs before and after, to logs/step-*.rsrec (60 s max).",
+     "Every physics step: core, ctx, rig, state, controller and outputs before and after, and what the state choice reads, to logs/step-*.rsrec (60 s max).",
      {}, [] { return hooked.load(); }, &switch_recording, &recording_status},
 }};
 Probe& state_probe = probes[0];
@@ -304,6 +304,36 @@ void observe(std::uint32_t kind, std::uintptr_t core) {
     } catch (...) {}
 }
 
+// skater.step, around the state choice (kind 4 before, kind 5 after): everything the chooser reads
+// (re/controller/state-selection.md), so the C# rebuild can make the same choice from the same inputs.
+void record_choice(std::uint32_t kind, std::uintptr_t core) {
+    const auto state = pointer_at(core + step::core_state_offset);
+    const auto chooser = pointer_at(core + step::core_chooser_offset);
+    if (kind == 5) {
+        const Section after[]{{tag("CHSR"), chooser, step::chooser_bytes}};
+        write_record(kind, core, state_id(state), after, std::size(after));
+        return;
+    }
+    const auto ctx = pointer_at(core + step::core_ctx_offset);
+    const auto bundle = chooser ? pointer_at(chooser) : 0;
+    const auto chooser_10 = chooser ? pointer_at(chooser + 0x10) : 0;
+    const Section before[]{
+        {tag("CTX_"), ctx, step::ctx_size},
+        {tag("RIG_"), pointer_at(core + step::core_rig_offset), step::rig_size},
+        {tag("CHSR"), chooser, step::chooser_bytes},
+        {tag("SBUN"), bundle, step::bundle_bytes},
+        {tag("SB10"), bundle ? pointer_at(bundle + 0x10) : 0, step::bundle_10_bytes},
+        {tag("SBA_"), bundle ? pointer_at(bundle + 0x20) : 0, step::bundle_state_bytes},
+        {tag("SB30"), bundle ? pointer_at(bundle + 0x30) : 0, step::bundle_30_bytes},
+        {tag("SB38"), bundle ? pointer_at(bundle + 0x38) : 0, step::bundle_38_bytes},
+        {tag("CH18"), chooser_10 ? pointer_at(chooser_10 + 0x18) : 0, step::chooser_owner_bytes},
+        {tag("INSG"), ctx ? pointer_at(ctx + step::ctx_instance_g_offset) : 0, step::instance_g_bytes},
+        {tag("INSS"), ctx ? pointer_at(ctx + step::ctx_instance_s_offset) : 0, step::instance_s_bytes},
+        {tag("INSK"), ctx ? pointer_at(ctx + step::ctx_instance_k_offset) : 0, step::instance_k_bytes},
+    };
+    write_record(kind, core, state_id(state), before, std::size(before));
+}
+
 void __fastcall pre_tick_hook(std::uintptr_t core) {
     observe(1, core);
     pre_tick_original(core);
@@ -311,6 +341,12 @@ void __fastcall pre_tick_hook(std::uintptr_t core) {
 void __fastcall physics_step_hook(std::uintptr_t core) {
     physics_step_original(core);
     observe(2, core);
+}
+void __fastcall advance_state_hook(std::uintptr_t core) {
+    const bool recording_choice = step_probe.enabled.load(std::memory_order_relaxed) && core == local_core();
+    if (recording_choice) try { record_choice(4, core); } catch (...) {}
+    advance_state_original(core);
+    if (recording_choice) try { record_choice(5, core); } catch (...) {}
 }
 
 bool fingerprint(std::uintptr_t address, const game::build::Fingerprint& expected) {
@@ -324,26 +360,37 @@ std::span<Probe> skater_probes() { return probes; }
 bool start_skater_probes(std::uintptr_t base) noexcept {
     if (hooked.load()) return true;
     image_base = base;
-    const auto pre = base + step::pre_tick_contract.rva;
-    const auto after = base + step::physics_step_contract.rva;
-    if (!fingerprint(pre, step::pre_tick_contract) || !fingerprint(after, step::physics_step_contract)) {
-        logging::write(logging::Level::warning, logging::Channel::diagnostics,
-            "Debug tool: the skater step's code differs from this build's; skater probes off.");
+    struct Hook { const game::build::Fingerprint* contract; void* detour; Step* original; };
+    const Hook hooks[]{
+        {&step::pre_tick_contract, reinterpret_cast<void*>(&pre_tick_hook), &pre_tick_original},
+        {&step::physics_step_contract, reinterpret_cast<void*>(&physics_step_hook), &physics_step_original},
+        {&step::advance_state_contract, reinterpret_cast<void*>(&advance_state_hook), &advance_state_original},
+    };
+    for (const auto& hook : hooks)
+        if (!fingerprint(base + hook.contract->rva, *hook.contract)) {
+            logging::write(logging::Level::warning, logging::Channel::diagnostics,
+                "Debug tool: the skater step's code differs from this build's; skater probes off.");
+            return false;
+        }
+    std::size_t prepared = 0;
+    for (const auto& hook : hooks) {
+        void* original{};
+        if (hook_prepare(reinterpret_cast<void*>(base + hook.contract->rva), hook.detour, &original) != HookOk) break;
+        *hook.original = reinterpret_cast<Step>(original);
+        ++prepared;
+    }
+    if (prepared != std::size(hooks)) {
+        for (std::size_t i = 0; i < prepared; ++i) hook_remove(reinterpret_cast<void*>(base + hooks[i].contract->rva));
         return false;
     }
-    void* pre_original{};
-    void* after_original{};
-    if (hook_prepare(reinterpret_cast<void*>(pre), reinterpret_cast<void*>(&pre_tick_hook), &pre_original) != HookOk)
-        return false;
-    if (hook_prepare(reinterpret_cast<void*>(after), reinterpret_cast<void*>(&physics_step_hook), &after_original) != HookOk) {
-        hook_remove(reinterpret_cast<void*>(pre));
-        return false;
+    std::size_t enabled = 0;
+    for (const auto& hook : hooks) {
+        if (hook_enable(reinterpret_cast<void*>(base + hook.contract->rva)) != HookOk) break;
+        ++enabled;
     }
-    pre_tick_original = reinterpret_cast<Step>(pre_original);
-    physics_step_original = reinterpret_cast<Step>(after_original);
-    if (hook_enable(reinterpret_cast<void*>(pre)) != HookOk) return false;
-    if (hook_enable(reinterpret_cast<void*>(after)) != HookOk) {
-        hook_disable(reinterpret_cast<void*>(pre));
+    if (enabled != std::size(hooks)) {
+        // Keep the trampolines: a detour already entered on another thread may still forward through them.
+        for (std::size_t i = 0; i < enabled; ++i) hook_disable(reinterpret_cast<void*>(base + hooks[i].contract->rva));
         return false;
     }
     hooked.store(true);
