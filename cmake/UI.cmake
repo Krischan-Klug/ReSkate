@@ -15,7 +15,6 @@ add_library(dingosdk_overlay STATIC
     Extension/UI/Overlay/screen_edge_overlay.cpp
     Extension/UI/Overlay/score_card_overlay.cpp
     Extension/UI/Overlay/overlay_images.cpp
-    Extension/UI/Overlay/debug_panel_overlay.cpp
     Extension/UI/Overlay/chat_emotes.cpp
     Extension/UI/Overlay/chat_rich.cpp
     Extension/UI/Overlay/console_suggestions.cpp

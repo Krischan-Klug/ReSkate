@@ -414,28 +414,6 @@ struct MeatFrame {
 };
 using MeatFeed = MeatFrame (*)(); // every presented frame
 void set_hall_of_meat_feed(MeatFeed) noexcept;
-// The debug panel (Extension/Debug/debug_panel.h): one source's live values in the bottom
-// right corner. A field flashes when its value changes.
-struct DebugField {
-    std::string label, value;
-    float changed{}; // 1 the moment it changed, falling to 0
-    bool heading{};  // a section title: label only
-};
-struct DebugPanel {
-    std::string title; // the shown source's
-    std::vector<DebugField> fields;
-};
-struct DebugSource {
-    std::string id, title; // `debugpanel <id>` shows it
-};
-struct DebugPanelHooks {
-    DebugPanel (*panel)() = nullptr;                 // every presented frame; no fields while hidden
-    std::vector<DebugSource> (*sources)() = nullptr; // SETTINGS > INTERFACE offers these
-    std::string (*selected)() = nullptr;             // the shown source's id, empty while hidden
-};
-void set_debug_panel_hooks(DebugPanelHooks) noexcept;
-std::vector<DebugSource> debug_panel_sources();
-std::string debug_panel_selected();
 using ParkSurfaceQueue = bool (*)(const EditorSurfaceRequest &);
 void set_park_surface_queue(ParkSurfaceQueue) noexcept;
 using ParkPreviewQueue = bool (*)(const EditorPreviewRequest &);

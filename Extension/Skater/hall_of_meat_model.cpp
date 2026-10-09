@@ -144,9 +144,8 @@ void Tracker::hit(std::size_t index, float speed, bool vehicle, double at, std::
         auto& impact = impacts_[bone.impact];
         impact.speed = std::max(impact.speed, speed);
         impact.vehicle = impact.vehicle || vehicle;
-        last_impact_ = bone.impact;
     } else if (impact_count_ < max_impacts) {
-        bone.impact = last_impact_ = impact_count_;
+        bone.impact = impact_count_;
         impacts_[impact_count_++] = {index, speed, vehicle};
     }
     bone.hit_at = at;
@@ -169,9 +168,7 @@ bool Tracker::end(std::uint64_t now, Summary* ended) noexcept {
 }
 
 // The bail's time, on the game's clock: until the body came to rest, or the bail ended, or the latest step.
-// Riding with no bail stopped yet there has been no bail: no time.
 double Tracker::bail_ms() const noexcept {
-    if (!stopped_at_ && phase_ == Phase::riding) return 0.0;
     return std::max(0.0, (stopped_at_ ? *stopped_at_ : played_) - started_);
 }
 
@@ -252,15 +249,5 @@ float Tracker::break_effect(std::uint64_t now) const noexcept {
 
 float Tracker::game_speed(std::uint64_t now) const noexcept {
     return 1.0f - (1.0f - break_game_speed) * break_effect(now);
-}
-
-Report Tracker::report(std::uint64_t now) const noexcept {
-    Report report;
-    report.phase = phase(now);
-    report.tally = tally();
-    report.hit = impact_count_ > 0;
-    if (report.hit) report.last = impacts_[last_impact_];
-    report.game_speed = game_speed(now);
-    return report;
 }
 }

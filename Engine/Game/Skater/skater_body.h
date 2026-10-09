@@ -27,7 +27,6 @@ inline constexpr std::array<const char*, count> names{
     "Lower back", "Spine", "Left toes", "Left foot", "Left shin", "Left thigh",
     "Right toes", "Right foot", "Right shin", "Right thigh", "Pelvis"};
 constexpr std::size_t index(Bone bone) noexcept { return static_cast<std::size_t>(bone); }
-constexpr const char* name(Bone bone) noexcept { return names[index(bone)]; }
 // The feet touch the ground and the board all the time; their contacts do not tell
 // whether a body is still tumbling.
 constexpr bool foot(Bone bone) noexcept {
@@ -45,56 +44,13 @@ struct HitKinds {
 // One body in one physics step: whether it touches something, and its hardest contact. Bodies
 // only have contacts while the ragdoll simulates them (a bail): not while riding or walking.
 struct BodyContact {
-    bool touching{};        // a contact in this step
-    float since_contact{};  // seconds since its last contact
-    bool sensitive{};       // its contacts are the sensitive body contact (a bail's)
-    Vec3 velocity{};        // its own velocity, metres per second
-    float impact{};         // the hardest contact's speed along its normal, metres per second
-    bool tracked_point{};   // that contact was near one of the game's two tracked points
-    Vec3 normal{};          // the hardest contact's normal
-    Vec3 slide{};           // normal x relative velocity: its length is the speed along the surface
-    Vec3 point{};           // where it touched, world space
+    bool touching{}; // a contact in this step
+    float impact{};  // the hardest contact's speed along its normal, metres per second
+    Vec3 slide{};    // its normal x relative velocity: the length is the speed along the surface
     HitKinds hit;
 };
 // The whole body in one physics step.
 struct Contacts {
     std::array<BodyContact, count> bodies{};
-    bool any{};           // some body touches something
-    bool sensitive{};     // a sensitive body touches something: the contact a bail takes
-    bool other{};         // a body that is not sensitive touches something
-    bool feet_on_board{}; // a toe or foot touches the board
 };
-// Several physics steps as one, for a reader slower than the physics (a panel, a log): start
-// from {} and hold each step. A flag or a hit set in any of them stays set; each body keeps its
-// hardest contact with its motion at that moment, or while none hit anything the latest step's.
-// The rest (since the last contact, sensitive) is the latest step's.
-constexpr void hold(Contacts& held, const Contacts& step) noexcept {
-    held.any = held.any || step.any;
-    held.sensitive = held.sensitive || step.sensitive;
-    held.other = held.other || step.other;
-    held.feet_on_board = held.feet_on_board || step.feet_on_board;
-    for (std::size_t body = 0; body < count; ++body) {
-        auto& h = held.bodies[body];
-        const auto& s = step.bodies[body];
-        h.touching = h.touching || s.touching;
-        h.since_contact = s.since_contact;
-        h.sensitive = s.sensitive;
-        h.hit = {h.hit.board || s.hit.board, h.hit.vehicle || s.hit.vehicle, h.hit.world || s.hit.world,
-            h.hit.kind_5 || s.hit.kind_5, h.hit.kind_11 || s.hit.kind_11};
-        if (s.impact < h.impact) continue;
-        h.velocity = s.velocity;
-        h.impact = s.impact;
-        h.tracked_point = s.tracked_point;
-        h.normal = s.normal;
-        h.slide = s.slide;
-        h.point = s.point;
-    }
-}
-// The body with the hardest impact in the step, 0 (the board's root) when none hit anything.
-constexpr std::size_t hardest(const Contacts& contacts) noexcept {
-    std::size_t best{};
-    for (std::size_t body = 1; body < count; ++body)
-        if (contacts.bodies[body].impact > contacts.bodies[best].impact) best = body;
-    return best;
-}
 }

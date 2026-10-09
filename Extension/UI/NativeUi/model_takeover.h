@@ -11,7 +11,6 @@
 namespace dingosdk::native_ui {
 // Startup, with the game's image base: hooks the UI model's write when it matches this build.
 bool start_model_takeover(std::uintptr_t base) noexcept;
-bool model_takeover_available() noexcept;
 
 // The value bytes of a field as the model's write takes them.
 using FieldValue = std::uint64_t;
@@ -37,7 +36,4 @@ public:
 private:
     std::size_t slot_;
 };
-
-// How often the game wrote a taken-over field with another value than the taker's, held back.
-std::uint64_t held_back() noexcept;
 }

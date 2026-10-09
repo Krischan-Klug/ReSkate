@@ -14,6 +14,8 @@
 #include <cstring>
 #include <memory>
 #include <mutex>
+#include <string>
+#include <vector>
 
 namespace dingosdk::hud_corner {
 namespace {
@@ -39,8 +41,12 @@ constexpr std::array<Switch, 2> score_switches{{
     {corner::hud_widget_active, 1, 0},
     {corner::extra_info_style, 4, static_cast<std::uint32_t>(corner::extra_info_none)},
 }};
-constexpr std::size_t hud_switch = 0, style_switch = 1;
 
+// What a feature covers.
+struct Claim {
+    std::string owner;
+    Cover cover{};
+};
 struct Shared {
     std::atomic<Address> base{};
     std::mutex mutex; // guards claims
@@ -214,15 +220,6 @@ void hold_score(Shared& s, const menu_data::Context& context, bool held) {
 }
 } // namespace
 
-std::string_view name(Cover cover) noexcept {
-    switch (cover) {
-    case Cover::none: return "none";
-    case Cover::dpad: return "dpad";
-    case Cover::all: return "all";
-    }
-    return "?";
-}
-
 void start(std::uintptr_t base) noexcept {
     auto& s = shared();
     s.base.store(base, std::memory_order_release);
@@ -246,46 +243,6 @@ void set_cover(std::string_view owner, Cover cover) {
     } else {
         s.claims.push_back({std::string(owner), cover});
     }
-}
-
-std::vector<Claim> claims() {
-    auto& s = shared();
-    std::lock_guard lock(s.mutex);
-    return s.claims;
-}
-
-State state() noexcept {
-    auto& s = shared();
-    State result;
-    try {
-        with_ui_models(s.base.load(std::memory_order_acquire), [&](const menu_data::Context& context) {
-            follow_registry(s, context);
-            if (find_stack(s, context)) {
-                result.stack_found = true;
-                result.target_index = at<std::int32_t>(context, context.field(s.stack, corner::target_index));
-                result.stack_active = at<std::uint8_t>(context, context.field(s.stack, corner::is_active)) != 0;
-                const auto items = items_of(context, s.stack);
-                unsigned count{}, stride{};
-                (void)context.array(items, 16, count, stride);
-                for (unsigned index = 0; index < count; ++index) {
-                    const auto item = context.element(items, index);
-                    result.items.push_back({widget_of(context, item), at<std::int32_t>(context, context.field(item, corner::item_priority)),
-                        at<std::uint8_t>(context, context.field(item, corner::is_active)) != 0,
-                        at<std::uint32_t>(context, context.field(item, corner::item_key)) == cover_key});
-                }
-            }
-            if (s.score && find_score(s, context)) {
-                result.score_found = true;
-                result.score_shown = score_value(s, context, hud_switch) != 0;
-                result.extra_info_style = static_cast<int>(static_cast<std::int32_t>(score_value(s, context, style_switch)));
-                result.score_held = score_held(s);
-            }
-        });
-    } catch (...) {
-        s.stack = {};
-        s.score_model = {};
-    }
-    return result;
 }
 
 void on_client_tick() noexcept {

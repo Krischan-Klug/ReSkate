@@ -9,7 +9,7 @@
 // Hall of Meat, the model: what a bail did to the skater, and what it scores. Fed one
 // physics step at a time with what each body touched (Engine/Game/Skater/skater_body.h)
 // and whether the game simulates the body as a ragdoll (Engine/Game/Skater/skater_state.h);
-// read by the overlay and the debug panel. No game access, no locking: the caller owns both.
+// read by the overlay. No game access, no locking: the caller owns both.
 //
 // A bail follows the skater, not a clock:
 //   riding  → bailing     the game's wipeout, and nothing else: a fall from height ragdolls in the
@@ -194,14 +194,6 @@ struct View {
     float break_pulse{}; // the red edge after a bone breaks: rising to 1, falling to 0
     Tally tally;
 };
-// The bail at one moment, for the debug panel, whether it hurt a bone or not.
-struct Report {
-    Phase phase{};
-    Tally tally;
-    bool hit{};              // the bail has a hit: last is it
-    Impact last;
-    float game_speed{1.0f};  // how fast the game is to run now (Tracker::game_speed)
-};
 // A finished bail, for the log and the map's best.
 struct Summary {
     bool shown{}; // it hurt a bone, so it showed (and counts for a best)
@@ -218,9 +210,10 @@ public:
     // The skater is gone (a respawn, a teleport, a map change): a bail ends now. True when one did.
     bool lose(std::uint64_t now, Summary* ended = nullptr) noexcept;
     View view(std::uint64_t now) const noexcept;
+    // Where the bail is at `now`, whether it hurt a bone (and so shows) or not.
+    Phase phase(std::uint64_t now) const noexcept;
     // How fast the game is to run now: down to break_game_speed as a break hits, else 1.
     float game_speed(std::uint64_t now) const noexcept;
-    Report report(std::uint64_t now) const noexcept;
     void reset() noexcept { *this = {}; }
 
 private:
@@ -246,7 +239,6 @@ private:
     void count(std::uint64_t now, const Step& step, double step_ms) noexcept;
     void hit(std::size_t bone, float speed, bool vehicle, double at, std::uint64_t now) noexcept;
     bool end(std::uint64_t now, Summary* ended) noexcept;
-    Phase phase(std::uint64_t now) const noexcept;
     double bail_ms() const noexcept;
     Tally tally() const noexcept;
     Injury injury_of(const BoneState& bone) const noexcept;
@@ -274,6 +266,5 @@ private:
     std::array<BoneState, skater_body::count> bones_{};
     std::array<Impact, max_impacts> impacts_{};
     std::size_t impact_count_{};
-    std::size_t last_impact_{}; // the impact the latest hit belonged to
 };
 }

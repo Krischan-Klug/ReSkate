@@ -1,7 +1,6 @@
 #pragma once
 #include "hall_of_meat_model.h"
 #include "Extension/UI/Overlay/overlay.h"
-#include <cstdint>
 #include <string_view>
 
 // Hall of Meat, as in skate. 3: when the local skater bails, the bones it hurt show over the
@@ -32,14 +31,4 @@ bool enabled() noexcept;
 void set_enabled(bool enabled) noexcept;
 // The overlay's feed (render thread): the skeleton, counter and card to draw now.
 overlay::MeatFrame frame();
-// Any thread: everything the tracker knows now, for the debug panel (hall_of_meat_debug.h).
-Report report() noexcept;
-// Client thread: whether the slow motion holds the game's speed settings now (game_speed.h).
-bool slowing() noexcept;
-// Any thread: the local skater's physics steps as Hall of Meat sees them, for the debug panel.
-struct Steps {
-    float seconds{};          // the latest step's length, in the game's time
-    std::uint64_t count{};    // steps seen since startup
-};
-Steps steps() noexcept;
 }

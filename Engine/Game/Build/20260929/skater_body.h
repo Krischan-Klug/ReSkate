@@ -54,39 +54,19 @@ inline constexpr Fingerprint bone_record_fill_contract{0x477396f, {
 inline constexpr Fingerprint bone_hit_kinds_contract{0x47739d4, {
     0x08,0x41,0x63,0x44,0x08,0x41,0x60,0x44,0x08,0x49,0x61,0x44,0x08,0x51,0x62,0x41,
     0x83,0xff,0x04,0x0f,0x94,0xc0,0x08,0x41,0x64,0x45,0x84,0xdb,0x0f,0x84,0x9d,0x00}};
-// Per bone besides the records: a float at contact+0x280 counts down by each step's time and
-// is zeroed by a contact, so it is minus the seconds since the bone's last contact; a byte at
-// contact+0x340 is set while the bone touches something in this step.
+// Per bone besides the records: a byte at contact+0x340 is set while the bone touches something in
+// this step, cleared at the start of each step and set by a contact (beside the bone's contact timer
+// at contact+0x280, which a contact zeroes).
 inline constexpr Fingerprint bone_contact_timer_contract{0x4772ee0, {
     0xc5,0xfa,0x10,0x84,0x8f,0x80,0x02,0x00,0x00,0xc5,0xfa,0x5c,0x4a,0x60,0x48,0x6b,
     0xc1,0x70,0xc5,0xfa,0x11,0x8c,0x8f,0x80,0x02,0x00,0x00,0x44,0x88,0x9c,0x39,0x40}};
 inline constexpr Fingerprint bone_contact_contract{0x4773529, {
     0xc7,0x84,0x9f,0x80,0x02,0x00,0x00,0x00,0x00,0x00,0x00,0xc6,0x84,0x3b,0x40,0x03,
     0x00,0x00,0x01,0xc5,0xfa,0x10,0x84,0x9f,0xe0,0x02,0x00,0x00,0xc4,0xc1,0x78,0x2f}};
-// A contact of a bone marked at contact+0x358 (one byte per bone, from the config) sets the
-// sensitive body contact +0x10fe (no_bail.h body_contact_contracts); any other one +0x10fd.
-inline constexpr Fingerprint sensitive_bone_contract{0x4773aa4, {
-    0x80,0xbc,0x3b,0x58,0x03,0x00,0x00,0x00,0x74,0x0e,0x45,0x84,0xf6,0x75,0x09,0xc6,
-    0x87,0xfe,0x10,0x00,0x00,0x01,0xeb,0x07,0xc6,0x87,0xfd,0x10,0x00,0x00,0x01,0x0f}};
-// A toe or foot (15, 16, 19, 20) touching kind 4 sets +0x1107; every contact +0x110b.
-inline constexpr Fingerprint feet_on_board_contract{0x477332e, {
-    0xc6,0x87,0x07,0x11,0x00,0x00,0x01,0xc4,0xe3,0x7d,0x19,0xd0,0x01,0xc4,0xc1,0xf9,
-    0x7e,0xd8,0xc4,0xc3,0x79,0x14,0xc1,0x01,0xc6,0x87,0x0b,0x11,0x00,0x00,0x01,0x49}};
-// The bone's own velocity in the contact: contact+0x10c0 -> the bodies' state, one float[4] per
-// bone at +0xec0, metres per second in the world. In the bails of 2026-10-06 its part along the
-// surface matched both the slide (+0x20) and how fast the contact point moved.
-inline constexpr Fingerprint bone_velocity_state_contract{0x47735cb, {
-    0x48,0x8b,0x97,0xc0,0x10,0x00,0x00,0x49,0x8b,0x00,0x49,0x8b,0x48,0x08,0xc5,0xfa,
-    0x10,0x76,0x60,0xc5,0x7a,0x10,0x9c,0x9a,0x60,0x12,0x00,0x00,0x48,0x85,0xc0,0x74}};
-inline constexpr Fingerprint bone_velocity_contract{0x477368b, {
-    0x48,0x05,0xec,0x00,0x00,0x00,0x48,0x03,0xc0,0x80,0x7e,0x64,0x00,0xc5,0xf9,0x70,
-    0xcc,0xaa,0xc5,0xe8,0x58,0xd1,0xc5,0xf8,0x10,0x04,0xc2,0xc5,0x78,0x51,0xca,0xc5}};
 // Everything above, verified once before any of it is read.
-inline constexpr std::array<Fingerprint, 13> contracts{contacts_before_skeleton_contract, contact_holder_contract,
+inline constexpr std::array<Fingerprint, 9> contracts{contacts_before_skeleton_contract, contact_holder_contract,
     contact_struct_contract, bone_record_reset_contract, bone_peak_contract, bone_record_fill_contract,
-    bone_hit_kinds_contract,
-    bone_contact_timer_contract, bone_contact_contract, sensitive_bone_contract, feet_on_board_contract,
-    bone_velocity_state_contract, bone_velocity_contract};
+    bone_hit_kinds_contract, bone_contact_timer_contract, bone_contact_contract};
 // The core's step input (published at core+0x3c8 by core_set_pose_input): +0x20 is the length of the
 // skater's physics step in seconds, copied to the context's +0x17ec every update (core_apply_step_input)
 // and handed to the contacts and the skeleton. Taken from the simulation rate when the skater spawns
@@ -100,22 +80,12 @@ inline constexpr std::uintptr_t bone_record_size = 0x70;
 inline constexpr std::size_t body_bone_count = 0x18;
 inline constexpr std::uintptr_t bone_peak_offset = 0x50;      // float, ordinary contacts
 inline constexpr std::uintptr_t bone_tracked_peak_offset = 0x54; // float, near a tracked point
-inline constexpr std::uintptr_t bone_normal_offset = 0x00;       // float[4], and its tracked one at +0x10
 inline constexpr std::uintptr_t bone_slide_offset = 0x20;        // float[4], and its tracked one at +0x30
 inline constexpr std::uintptr_t bone_tracked_offset = 0x10;      // from an ordinary field to its tracked one
-inline constexpr std::uintptr_t bone_point_offset = 0x40;        // float[4]
 inline constexpr std::uintptr_t bone_hit_vehicle_offset = 0x60;  // bytes
 inline constexpr std::uintptr_t bone_hit_kind_11_offset = 0x61;
 inline constexpr std::uintptr_t bone_hit_kind_5_offset = 0x62;
 inline constexpr std::uintptr_t bone_hit_world_offset = 0x63;
 inline constexpr std::uintptr_t bone_hit_board_offset = 0x64;
-inline constexpr std::uintptr_t bone_since_contact_offset = 0x280; // contact struct, float per bone
-inline constexpr std::uintptr_t bone_touching_offset = 0x340;      // contact struct, byte per bone
-inline constexpr std::uintptr_t sensitive_bones_offset = 0x358;    // contact struct, byte per bone
-inline constexpr std::uintptr_t sensitive_contact_offset = 0x10fe; // contact struct, byte
-inline constexpr std::uintptr_t other_contact_offset = 0x10fd;     // contact struct, byte
-inline constexpr std::uintptr_t feet_on_board_offset = 0x1107;     // contact struct, byte
-inline constexpr std::uintptr_t any_contact_offset = 0x110b;       // contact struct, byte
-inline constexpr std::uintptr_t body_state_offset = 0x10c0;        // contact struct, pointer
-inline constexpr std::uintptr_t bone_velocities_offset = 0xec0;    // body state, float[4] per bone
+inline constexpr std::uintptr_t bone_touching_offset = 0x340;    // contact struct, byte per bone
 }

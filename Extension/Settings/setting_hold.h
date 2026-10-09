@@ -21,7 +21,6 @@ public:
     bool hold(std::string_view value);
     // Gives the setting back (unless it is someone else's now), and may hold it again.
     void release();
-    bool held() const noexcept { return before_.has_value(); }
 
 private:
     std::string name_;

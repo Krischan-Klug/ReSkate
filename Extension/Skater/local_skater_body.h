@@ -28,9 +28,6 @@ bool add_step_observer(StepObserver observer) noexcept;
 // No Bail's skeleton hook: every physics step of any skater's rig, `seconds` long.
 void on_physics_step(std::uintptr_t rig, float seconds, bool wipeout) noexcept;
 
-// Any thread: where the local skater's physics step length is kept now (a float, seconds of game
-// time), 0 while there is no local skater. Also for diagnostics: Extension/Debug/write_watch.h.
-std::uintptr_t step_length_address() noexcept;
 // Game update thread: gives the local skater this physics step length (seconds). The game sets it
 // only when it builds the skater's core, from the simulation rate then (Extension/Settings/
 // game_speed.h follows a rate it changes with it). False while there is no local skater.

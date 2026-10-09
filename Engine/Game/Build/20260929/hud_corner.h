@@ -21,8 +21,6 @@ inline constexpr std::string_view dpad_widget = "UI/Features/HUD/Dpad/Widgets/HU
 inline constexpr std::int32_t dpad_priority = 1, score_priority = 3;
 // StackViewModel
 inline constexpr std::uint32_t stack_items = 0x61742cb4;        // Items
-inline constexpr std::uint32_t target_index = 0x18f8355b;       // int32 TargetIndex (-1: by priority)
-inline constexpr std::uint32_t is_active = 0x369babfe;          // bool IsActive, a stack's and an item's (their widgets write it)
 inline constexpr std::uint32_t default_transition = 0x54c9abee; // DefaultTransitionStyle, which a push gives each item
 // StackItemViewModel
 inline constexpr std::uint32_t item_key = 0x1e95752c;        // uint32 Key: the stack tells its items apart by it

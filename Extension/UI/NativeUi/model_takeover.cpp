@@ -30,7 +30,6 @@ struct Hook {
     std::atomic<bool> ready{};
     std::array<Slot, slot_count> slots;
     std::mutex slots_mutex; // guards claiming a slot
-    std::atomic<std::uint64_t> held_back{};
 };
 Hook& hook() {
     static auto* value = new Hook;
@@ -47,7 +46,6 @@ std::uint64_t model_write(Address manager, std::uint64_t handle, Address type, c
             std::memcpy(&meant, value, slot.size);
             slot.meant.store(meant, std::memory_order_release);
             mine = slot.ours.load(std::memory_order_acquire);
-            if (meant != mine) h.held_back.fetch_add(1, std::memory_order_relaxed);
             value = &mine;
             break;
         }
@@ -81,8 +79,6 @@ bool start_model_takeover(std::uintptr_t base) noexcept {
     h.ready.store(true, std::memory_order_release);
     return true;
 }
-
-bool model_takeover_available() noexcept { return hook().ready.load(std::memory_order_acquire); }
 
 TakenField::TakenField(std::size_t size) {
     if (size != 1 && size != 2 && size != 4 && size != 8) throw std::invalid_argument("A taken-over field holds 1 to 8 bytes.");
@@ -128,6 +124,4 @@ FieldValue TakenField::give_back() noexcept {
     slot.taken.store(false, std::memory_order_release);
     return slot.meant.load(std::memory_order_acquire);
 }
-
-std::uint64_t held_back() noexcept { return hook().held_back.load(std::memory_order_relaxed); }
 }

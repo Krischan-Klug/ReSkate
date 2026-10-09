@@ -1,8 +1,6 @@
 #pragma once
 #include <cstdint>
-#include <string>
 #include <string_view>
-#include <vector>
 
 // skate.'s HUD in the bottom left corner (the d-pad menu, and the score HUD there while a line goes
 // on), covered for any feature that asks, each part the way it shows
@@ -21,36 +19,11 @@ enum class Cover : std::uint8_t {
     dpad, // the d-pad: the score HUD still shows as the game has it
     all,  // the d-pad and the score HUD
 };
-std::string_view name(Cover cover) noexcept; // "none", "dpad", "all"
 
 // Startup, with the game's image base: without the model takeover the score HUD is not covered.
 void start(std::uintptr_t base) noexcept;
 // Any thread. `owner` covers this from now on (none: no longer anything). The most any feature covers is covered.
 void set_cover(std::string_view owner, Cover cover);
-struct Claim {
-    std::string owner;
-    Cover cover{};
-};
-std::vector<Claim> claims(); // any thread: every feature that covers something
-
-// What the corner shows now. Client thread.
-struct Item {
-    std::string widget; // its content's blueprint, "" for ours
-    std::int32_t priority{};
-    bool active{};
-    bool ours{};
-};
-struct State {
-    bool stack_found{}; // the stack the d-pad is in
-    std::int32_t target_index{};
-    bool stack_active{};
-    std::vector<Item> items;
-    bool score_found{};   // ScoringHUDViewModel
-    bool score_shown{};   // its HudWidgetActive
-    int extra_info_style{};
-    bool score_held{};    // taken over: the score HUD held down
-};
-State state() noexcept;
 // Client thread, every tick: covers and uncovers the corner as the features ask.
 void on_client_tick() noexcept;
 }
