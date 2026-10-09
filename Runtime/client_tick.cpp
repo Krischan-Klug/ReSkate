@@ -6,6 +6,7 @@
 #include "Engine/Core/Profiling/profiler.h"
 #include "Extension/Settings/job_spin.h"
 #include "Engine/Game/World/client_state.h"
+#include "Extension/HallOfMeat/hall_of_meat.h"
 #include "Extension/Skater/camera_observer.h"
 #include "Extension/UI/NativeMenu/native_menu.h"
 #include "Extension/Multiplayer/Hud/native_party.h"
@@ -19,16 +20,13 @@
 #include "Extension/Progression/fixed_stop_entitlement_provider.h"
 #include "Extension/Progression/mission_progression_override.h"
 #include "Extension/Progression/neighborhood_unlock_override.h"
-#include "Extension/Rendering/local_skater_render.h"
 #include "Extension/Settings/gameplay_settings_override.h"
 #include "Extension/Settings/named_settings.h"
 #include "Extension/Skater/ai_skaters.h"
 #include "Extension/Skater/client_source_spawn.h"
-#include "Extension/Skater/hall_of_meat.h"
 #include "Extension/Skater/skater_slot_override.h"
 #include "Extension/Throwdowns/native_throwdowns.h"
 #include "Extension/Trainer/trainer.h"
-#include "Extension/UI/NativeHud/hud_corner.h"
 #include "Extension/World/level_loading.h"
 #include "Extension/World/loading_screen.h"
 #include <dxgi.h>
@@ -608,9 +606,7 @@ void update_model(std::uintptr_t client, TickState& frame) {
         dingosdk::tick_network_objects();
     }
     if (r.observer_failed) return; // Keep the bounded restore/telemetry path available after catalog failure.
-    dingosdk::skater_render::on_client_tick();
     dingosdk::hall_of_meat::on_client_tick();
-    dingosdk::hud_corner::on_client_tick(); // after the features that cover it this tick
     if (!has_request && now < r.next_model && state == r.previous_state) return;
     r.next_model = now + 500;
     DINGO_PROFILE_ZONE("tick/update_model/world model (500 ms)");

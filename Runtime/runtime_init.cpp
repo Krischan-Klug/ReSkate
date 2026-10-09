@@ -10,6 +10,7 @@
 #include "Engine/Game/Build/supported_build.h"
 #include "Engine/Vfs/mod_catalog.h"
 #include "Extension/Boot/offline_boot.h"
+#include "Extension/HallOfMeat/hall_of_meat.h"
 #include "Extension/Skater/camera_observer.h"
 #include "Extension/Progression/entitlement_request_hook.h"
 #include "Extension/Skater/skater_observer.h"
@@ -25,15 +26,11 @@
 #include "Extension/Progression/neighborhood_unlock_override.h"
 #include "Extension/Progression/progression_service_guard.h"
 #include "Extension/Rendering/graphics_labels.h"
-#include "Extension/Rendering/local_skater_render.h"
 #include "Extension/Settings/gameplay_settings_override.h"
 #include "Extension/Settings/named_settings.h"
 #include "Extension/Skater/client_source_spawn.h"
-#include "Extension/Skater/hall_of_meat.h"
-#include "Extension/Skater/local_skater_body.h"
 #include "Extension/Skater/no_bail.h"
 #include "Extension/Skater/skater_slot_override.h"
-#include "Extension/UI/NativeHud/hud_corner.h"
 #include "Extension/UI/Startup/startup_window.h"
 #include "Extension/World/level_loading.h"
 #include "Extension/World/loading_screen.h"
@@ -372,14 +369,8 @@ extern "C" __declspec(dllexport) BOOL WINAPI DingoSDKDebugInitialize() {
         const bool camera_hook = dingosdk::start_camera_observer(r.base);
         record("{\"event\":\"camera_observer_initialized\",\"active\":" + std::string(camera_hook ? "true" : "false") + "}");
         (void)dingosdk::start_no_bail(r.base);
-        const bool body = dingosdk::skater_body::start(r.base);
-        record("{\"event\":\"skater_body_initialized\",\"active\":" + std::string(body ? "true" : "false") + "}");
-        const bool render = dingosdk::skater_render::start(r.base);
-        record("{\"event\":\"skater_render_initialized\",\"active\":" + std::string(render ? "true" : "false") + "}");
-        const bool meat = dingosdk::hall_of_meat::start();
-        if (meat) dingosdk::overlay::set_hall_of_meat_feed(&dingosdk::hall_of_meat::frame);
+        const bool meat = dingosdk::hall_of_meat::start(r.base);
         record("{\"event\":\"hall_of_meat_initialized\",\"active\":" + std::string(meat ? "true" : "false") + "}");
-        dingosdk::hud_corner::start(r.base);
         const bool noclip_velocity = dingosdk::start_client_noclip_velocity(r.base);
         record("{\"event\":\"noclip_velocity_initialized\",\"active\":" + std::string(noclip_velocity ? "true" : "false") + "}");
         const bool loading_screens = dingosdk::loading_screen::start(r.base);

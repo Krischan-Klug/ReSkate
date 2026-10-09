@@ -7,9 +7,9 @@
 #include <optional>
 
 // Hall of Meat, the model: what a bail did to the skater, and what it scores. Fed one
-// physics step at a time with what each body touched (Engine/Game/Skater/skater_body.h)
-// and whether the game simulates the body as a ragdoll (Engine/Game/Skater/skater_state.h);
-// read by the overlay. No game access, no locking: the caller owns both.
+// physics step at a time (hall_of_meat_skater.h) with what each body touched
+// (Engine/Game/Skater/skater_body.h), how the skater moves and whether the game simulates the
+// body as a ragdoll; read by the overlay. No game access, no locking: the caller owns both.
 //
 // A bail follows the skater, not a clock:
 //   riding  → bailing     the game's wipeout, and nothing else: a fall from height ragdolls in the
@@ -33,17 +33,18 @@ using skater_body::Bone;
 
 // One physics step of the local skater.
 struct Step {
-    float seconds{}; // how long the step simulated, in the game's time (skater_body.h Step)
+    float seconds{}; // how long the step simulated, in the game's time
     bool wipeout{};  // the step asks for a wipeout
-    bool airborne{}; // the skater is in the air, on the board or off it (skater_state.h)
-    // The body is a ragdoll (skater_state.h Mode::ragdoll); empty when the skater state could not
-    // be read: such a step neither starts nor ends a bail by it.
+    bool airborne{}; // the skater is in the air, on the board or off it
+    // The body is a ragdoll; empty when the skater state could not be read: such a step neither
+    // starts nor ends a bail by it.
     std::optional<bool> ragdoll;
-    // How the skater moves (skater_state.h velocity), metres per second; empty when unknown: such
-    // a step neither rests nor stirs the body, and adds nothing to its fall or its speed.
+    // How the skater moves (with the board while on it, else as its pelvis), metres per second;
+    // empty when unknown: such a step neither rests nor stirs the body, and adds nothing to its
+    // fall or its speed.
     std::optional<game::Vec3> velocity;
-    // How fast the body turns, any way round (the length of skater_state.h body_spin), radians per
-    // second; empty when unknown: such a step adds nothing to its rotations.
+    // How fast the pelvis turns, any way round, radians per second; empty when unknown: such a
+    // step adds nothing to its rotations.
     std::optional<float> spin;
     skater_body::Contacts body; // what each body touched in the step
 };

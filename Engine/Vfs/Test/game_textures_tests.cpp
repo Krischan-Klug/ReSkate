@@ -3,7 +3,6 @@
 #include "Engine/Vfs/game_textures.h"
 #include "Engine/Game/Build/addresses.h"
 #include "Engine/Game/Build/20260929/ui_textures.h"
-#include "Engine/Resource/image_region.h"
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
@@ -11,6 +10,16 @@
 using namespace dingosdk;
 namespace {
 void check(bool value, const char* message) { if (!value) throw std::runtime_error(message); }
+
+// How much of a region of the image is solid, 0 to 1.
+float solid(const frostbite::Image& image, const addr::ui_textures::Region& region) {
+    const auto left = static_cast<std::uint32_t>(region.left * image.width), right = static_cast<std::uint32_t>(region.right * image.width);
+    const auto top = static_cast<std::uint32_t>(region.top * image.height), bottom = static_cast<std::uint32_t>(region.bottom * image.height);
+    std::size_t opaque{}, all{};
+    for (auto y = top; y < bottom; ++y)
+        for (auto x = left; x < right; ++x, ++all) opaque += image.rgba[(std::size_t{y} * image.width + x) * 4 + 3] >= 128;
+    return all ? static_cast<float>(opaque) / static_cast<float>(all) : 0.0f;
+}
 
 void the_overlays_textures_read(const char* game_root) {
     namespace ui = addr::ui_textures;
@@ -29,27 +38,15 @@ void the_overlays_textures_read(const char* game_root) {
     bool opaque{}, clear{};
     for (std::size_t i = 3; i < logo.rgba.size(); i += 4) (logo.rgba[i] ? opaque : clear) = true;
     check(opaque && clear, "the logo on a clear background");
-    const auto wordmark = frostbite::crop(logo, {ui::thrasher_wordmark.region.left, ui::thrasher_wordmark.region.top,
-        ui::thrasher_wordmark.region.right, ui::thrasher_wordmark.region.bottom});
-    bool under_arch{};
-    for (auto y = static_cast<std::uint32_t>(ui::thrasher_wordmark_arch * wordmark.height); y < wordmark.height; ++y)
-        for (auto x = wordmark.width / 5; x < wordmark.width - wordmark.width / 5; ++x)
-            under_arch |= wordmark.rgba[(std::size_t{y} * wordmark.width + x) * 4 + 3] >= 128;
-    check(!under_arch, "the wordmark's arch is clear beneath");
+    // Beneath the wordmark's arch, between a fifth in from either side, as fractions of the whole logo.
+    const auto& mark = ui::thrasher_wordmark.region;
+    const float fifth = (mark.right - mark.left) / 5;
+    check(solid(logo, {mark.left + fifth, mark.top + ui::thrasher_wordmark_arch * (mark.bottom - mark.top), mark.right - fifth, mark.bottom}) == 0,
+        "the wordmark's arch is clear beneath");
     bool refused{};
     try { (void)textures.read(ui::airtime.toc, ui::airtime.bundle, "ui/textures/icons/no_such_icon", 64); }
     catch (const std::runtime_error&) { refused = true; }
     check(refused, "a missing texture is refused");
-}
-
-// How much of a region of the image is solid, 0 to 1.
-float solid(const frostbite::Image& image, const addr::ui_textures::Region& region) {
-    const auto left = static_cast<std::uint32_t>(region.left * image.width), right = static_cast<std::uint32_t>(region.right * image.width);
-    const auto top = static_cast<std::uint32_t>(region.top * image.height), bottom = static_cast<std::uint32_t>(region.bottom * image.height);
-    std::size_t opaque{}, all{};
-    for (auto y = top; y < bottom; ++y)
-        for (auto x = left; x < right; ++x, ++all) opaque += image.rgba[(std::size_t{y} * image.width + x) * 4 + 3] >= 128;
-    return all ? static_cast<float>(opaque) / static_cast<float>(all) : 0.0f;
 }
 
 void the_ui_shapes_read(const char* game_root) {

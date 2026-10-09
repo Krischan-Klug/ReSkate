@@ -10,7 +10,7 @@
 #include <vector>
 
 // The skater's skeleton mesh (skate.'s own, Engine/Game/Build/20260929/skater_skeleton.h), posed
-// by the renderer's own skinning matrices (Extension/Rendering/local_skater_render.h), so it lies
+// by the renderer's own skinning matrices (Extension/HallOfMeat/hall_of_meat_render.h), so it lies
 // where the game draws the skater. Each vertex knows the ragdoll's body (skater_body.h) it moves
 // with, for whatever that body went through. No game access.
 namespace dingosdk::skater_skeleton {

@@ -1,4 +1,4 @@
-#include "skeleton_mesh.h"
+#include "hall_of_meat_skeleton.h"
 #include "Engine/Core/Log/logging.h"
 #include "Engine/Game/Build/addresses.h"
 #include "Engine/Game/Build/20260929/skater_skeleton.h"
@@ -13,9 +13,10 @@
 #include <thread>
 #include <vector>
 
-namespace dingosdk::skater_skeleton {
+namespace dingosdk::hall_of_meat {
 namespace {
 namespace build = addr::skater_skeleton;
+using skater_skeleton::Mesh;
 
 struct Loader {
     std::once_flag started;
@@ -50,7 +51,7 @@ std::vector<std::byte> chunk(const vfs::GameData& data, const vfs::GameBundle& b
 }
 }
 
-Mesh read_mesh(const std::filesystem::path& game_root) {
+Mesh read_skeleton_mesh(const std::filesystem::path& game_root) {
     const vfs::GameData data(game_root);
     const auto skeleton_toc = data.read_toc(build::skeleton_toc);
     const auto skeleton_document =
@@ -64,10 +65,10 @@ Mesh read_mesh(const std::filesystem::path& game_root) {
     const auto resource = asset(data, mesh_bundle, frostbite::AssetKind::resource, build::mesh_asset);
     const auto lod = frostbite::read_mesh_lod(resource, build::mesh_lod);
     const auto geometry = chunk(data, mesh_bundle, mesh_toc, lod.chunk);
-    return bind(skeleton, frostbite::read_skinned_mesh(resource, build::mesh_lod, geometry));
+    return skater_skeleton::bind(skeleton, frostbite::read_skinned_mesh(resource, build::mesh_lod, geometry));
 }
 
-void prepare() noexcept {
+void prepare_skeleton() noexcept {
     try {
         std::call_once(loader().started, [] {
             std::thread([] {
@@ -76,22 +77,22 @@ void prepare() noexcept {
                     std::vector<wchar_t> exe(32768);
                     const auto length = GetModuleFileNameW(nullptr, exe.data(), static_cast<DWORD>(exe.size()));
                     require(length && length < exe.size(), "the game's folder is unknown");
-                    auto read = std::make_shared<const Mesh>(read_mesh(std::filesystem::path(exe.data()).parent_path()));
+                    auto read = std::make_shared<const Mesh>(read_skeleton_mesh(std::filesystem::path(exe.data()).parent_path()));
                     logging::log(logging::Level::info, logging::Channel::skater,
-                        "Skater skeleton: read the game's own ({} vertices, {} triangles) in {} ms.", read->vertices.size(),
+                        "Hall of Meat: read the skater's skeleton ({} vertices, {} triangles) in {} ms.", read->vertices.size(),
                         read->triangles.size() / 3, GetTickCount64() - started);
                     loader().mesh.store(std::move(read));
                 } catch (const std::exception& failure) {
                     logging::log(logging::Level::warning, logging::Channel::skater,
-                        "Skater skeleton is unavailable: {}.", failure.what());
+                        "Hall of Meat shows no skeleton: {}.", failure.what());
                 }
             }).detach();
         });
     } catch (...) {
         logging::write(logging::Level::warning, logging::Channel::skater,
-            "Skater skeleton is unavailable: its reading could not start.");
+            "Hall of Meat shows no skeleton: its reading could not start.");
     }
 }
 
-std::shared_ptr<const Mesh> mesh() noexcept { return loader().mesh.load(); }
+std::shared_ptr<const Mesh> skeleton_mesh() noexcept { return loader().mesh.load(); }
 }

@@ -35,9 +35,7 @@ inline constexpr std::array<unsigned char, 0x88> reset_bail_causes_code{
     0x00,0x00,0x00,0x66,0x89,0x41,0x48,0x48,0x89,0x81,0xcc,0x00,0x00,0x00,0x88,0x41,
     0x4a,0x89,0x81,0xd4,0x00,0x00,0x00,0xc3,
 };
-// The post-physics skeleton response takes (rig, float dt, bool wipeout). The physics step of a
-// skater's core (skater_body.h) hands it the dt it hands the rig's contact processing: the step's
-// simulated time (context +0x17ec), the game's time, slower than the real one under a time scale.
+// The post-physics skeleton response takes (rig, float dt, bool wipeout).
 // The animation publisher takes the physics core. Both consume the explicit
 // request at context+13c4 bit 15 and the independent request at +13d4 bit 27.
 inline constexpr Fingerprint bail_skeleton_contract{0x4777eb0, {

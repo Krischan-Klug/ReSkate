@@ -1,15 +1,13 @@
 #include "hall_of_meat.h"
-#include "hall_of_meat_card.h"
-#include "hall_of_meat_model.h"
-#include "local_skater.h"
-#include "local_skater_body.h"
-#include "local_skater_state.h"
-#include "skeleton_mesh.h"
+#include "hall_of_meat_hud.h"
+#include "hall_of_meat_overlay.h"
+#include "hall_of_meat_render.h"
+#include "hall_of_meat_skater.h"
+#include "hall_of_meat_skeleton.h"
+#include "hall_of_meat_slow_motion.h"
 #include "Engine/Core/Log/logging.h"
-#include "Extension/Rendering/local_skater_render.h"
 #include "Extension/Profile/local_profile_runtime.h"
-#include "Extension/Settings/game_speed.h"
-#include "Extension/UI/NativeHud/hud_corner.h"
+#include "Extension/Skater/no_bail.h"
 #include <Windows.h>
 #include <algorithm>
 #include <atomic>
@@ -22,7 +20,6 @@ namespace dingosdk::hall_of_meat {
 namespace {
 constexpr const char* preference = "HallOfMeat";
 constexpr std::string_view best_prefix = "HallOfMeat.Best."; // + the level, lower case
-constexpr std::string_view hud_owner = "hallofmeat";
 
 struct State {
     std::atomic<bool> ready{}, enabled{true};
@@ -36,7 +33,7 @@ struct State {
     int best{};
     Standing standing;
     std::string level; // client thread only
-    GameSpeed game_speed; // client thread only: the slow motion after a break
+    SlowMotion slow_motion; // client thread only: after a break
 };
 State& state() { static auto* value = new State; return *value; }
 
@@ -51,25 +48,13 @@ void finished(State& s, const Summary& ended) noexcept {
     }
 }
 
-// Physics thread, every step of the local skater (local_skater_body.h): what each body touched
-// in the step and whether it is a ragdoll, and so where the bail is and what it did.
-void observe_step(const skater_body::Step& body_step) noexcept {
+// Physics thread, every step of the local skater (no_bail.h): what each body touched in the step
+// and whether it is a ragdoll, and so where the bail is and what it did.
+void observe_step(const NoBailSkater& skater, float seconds, bool wipeout) noexcept {
     auto& s = state();
     if (!s.enabled.load(std::memory_order_acquire)) return;
     const auto now = GetTickCount64();
-    Step step;
-    step.seconds = body_step.seconds;
-    step.wipeout = body_step.wipeout;
-    skater_state::SkaterState skater;
-    if (skater_state::read(body_step.skater, skater)) {
-        step.airborne = skater_state::airborne(skater);
-        if (skater_state::mode_known(skater)) step.ragdoll = skater_state::mode(skater) == skater_state::Mode::ragdoll;
-        if (skater.motion_known) {
-            step.velocity = skater_state::velocity(skater);
-            step.spin = game::length(skater.body_spin);
-        }
-    }
-    skater_body::read_contacts(body_step.skater, step.body);
+    const auto step = read_step(skater, seconds, wipeout);
     Summary ended;
     AcquireSRWLockExclusive(&s.lock);
     if (s.tracker.step(now, step, &ended)) finished(s, ended);
@@ -118,26 +103,18 @@ int saved_best(std::string_view level) noexcept {
     const auto best = value->get<double>();
     return std::isfinite(best) && best > 0 && best < 1e9 ? static_cast<int>(best) : 0;
 }
-
-overlay::MeatInjury to_overlay(Injury injury) {
-    return injury == Injury::broken ? overlay::MeatInjury::broken
-         : injury == Injury::hit    ? overlay::MeatInjury::hit
-                                    : overlay::MeatInjury::none;
-}
 }
 
-bool start() noexcept {
+bool start(std::uintptr_t base) noexcept {
     auto& s = state();
     if (s.ready.load(std::memory_order_acquire)) return true;
-    if (!skater_body::available()) {
-        logging::write(logging::Level::warning, logging::Channel::skater,
-            "Hall of Meat is unavailable: it needs the skater body, which did not start.");
-        return false;
-    }
+    if (!start_skater(base)) return false; // logged
+    (void)start_render(base);              // without it no skeleton shows: logged
+    start_hud(base);
     s.enabled.store(profile_runtime::local_preference(preference).value_or(true), std::memory_order_release);
-    skater_skeleton::prepare();
-    overlay::add_game_images(card_images());
-    skater_body::add_step_observer(&observe_step);
+    prepare_skeleton();
+    overlay::prepare_hall_of_meat_images();
+    set_no_bail_step_observer(&observe_step);
     s.ready.store(true, std::memory_order_release);
     logging::log(logging::Level::info, logging::Channel::skater, "Hall of Meat ready ({}).",
         s.enabled.load() ? "on" : "off");
@@ -148,8 +125,9 @@ void on_client_tick() noexcept {
     auto& s = state();
     if (!s.ready.load(std::memory_order_acquire)) return;
     try {
-        LocalSkater skater;
-        const bool gone = !current_local_skater(skater);
+        follow_render();
+        NoBailSkater skater;
+        const bool gone = !no_bail_skater(skater);
         const auto now = GetTickCount64();
         Summary summary, ended;
         bool pending{}, unsaved{}, card{};
@@ -165,9 +143,9 @@ void on_client_tick() noexcept {
         best = s.best;
         ReleaseSRWLockExclusive(&s.lock);
         // The card takes the place of skate.'s bottom left HUD while it shows: the bail is what counts.
-        hud_corner::set_cover(hud_owner, card ? hud_corner::Cover::all : hud_corner::Cover::none);
-        // A break slows the game down (in single player only: game_speed.h).
-        (void)s.game_speed.set(speed);
+        hide_hud(card);
+        // A break slows the game down (in single player only: hall_of_meat_slow_motion.h).
+        (void)s.slow_motion.set(speed);
         if (pending) log_bail(summary);
         if (unsaved && !s.level.empty()) profile_runtime::set_local_values({{best_key(s.level), static_cast<double>(best)}});
     } catch (...) { /* A lost log line or best is never worth the client tick. */ }
@@ -207,7 +185,7 @@ void set_enabled(bool enabled) noexcept {
     profile_runtime::set_local_preference(preference, enabled);
 }
 
-overlay::MeatFrame frame() {
+Frame frame() {
     auto& s = state();
     if (!enabled()) return {};
     const auto now = GetTickCount64();
@@ -221,27 +199,23 @@ overlay::MeatFrame frame() {
     ReleaseSRWLockExclusive(&s.lock);
     if (view.phase == Phase::riding) return {};
 
-    overlay::MeatFrame result;
-    result.card = score_card(view, against);
+    Frame result;
+    result.card = card(view, against);
     result.break_pulse = view.break_pulse;
     // The skeleton as the renderer drew the skater in the latest picture, seen by its camera.
-    const auto mesh = skater_skeleton::mesh();
-    skater_render::Picture picture;
+    auto mesh = skeleton_mesh();
+    Picture picture;
     skater_skeleton::Posed posed;
-    if (!mesh || !skater_render::latest(picture) || !skater_skeleton::pose(*mesh, picture.skin, posed))
-        return result;
+    if (!mesh || !latest_picture(picture) || !skater_skeleton::pose(*mesh, picture.skin, posed)) return result;
     auto& skeleton = result.skeleton;
-    skeleton.frame.camera = picture.camera;
-    skeleton.frame.vertical_fov = picture.vertical_fov;
-    skeleton.frame.positions = std::move(posed.positions);
-    skeleton.frame.normals = std::move(posed.normals);
-    skeleton.frame.triangles = {mesh, &mesh->triangles}; // the mesh's own, shared
-    skeleton.frame.parts = {mesh, &mesh->parts};
+    skeleton.camera = picture.camera;
+    skeleton.vertical_fov = picture.vertical_fov;
+    skeleton.positions = std::move(posed.positions);
+    skeleton.normals = std::move(posed.normals);
+    skeleton.mesh = std::move(mesh);
     skeleton.alpha = view.alpha;
-    for (std::size_t body = 0; body < skater_body::count; ++body) {
-        skeleton.injuries[body] = to_overlay(view.injuries[body]);
-        skeleton.flashes[body] = view.flashes[body];
-    }
+    skeleton.injuries = view.injuries;
+    skeleton.flashes = view.flashes;
     return result;
 }
 }

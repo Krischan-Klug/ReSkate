@@ -1,6 +1,4 @@
 #include "no_bail.h"
-#include "local_skater.h"
-#include "local_skater_body.h"
 #include "Engine/Core/Hooks/hooks.h"
 #include "Engine/Core/Log/logging.h"
 #include "Engine/Core/Platform/memory.h"
@@ -21,6 +19,8 @@ using SkeletonResponse = void (*)(std::uintptr_t, float, bool);
 using PublishAnimation = void (*)(std::uintptr_t);
 using ResetCauses = void (*)(std::uintptr_t);
 constexpr std::uintptr_t highest = memory::highest_user_address;
+// The hooks re-resolve the local skater's ownership (some 35 fields) on every
+// protected physics step: guarded same-process copies, not a system call each.
 template<class T> bool read(std::uintptr_t address, T& value) noexcept { return memory::peek(address, value); }
 struct LastError {
     DWORD value = GetLastError();
@@ -32,16 +32,19 @@ std::uintptr_t pointer(std::uintptr_t object, std::uintptr_t offset = 0) noexcep
         value < 0x10000 || value > highest - 0x1000100) return 0;
     return value;
 }
-// Protection applies to the published local skater (local_skater.h) while either
-// window is open.
+struct Owner {
+    std::uintptr_t client{}, entity{}, player{}, handle{}, component{}, core{}, context{}, selector{}, causes{}, rig{};
+    bool operator==(const Owner&) const = default;
+};
 struct Lease {
+    Owner owner;
     std::uint64_t manual_until{}, flight_until{};
     bool active(std::uint64_t now) const noexcept {
         return now < manual_until || now < flight_until;
     }
 };
 struct BoardLock {
-    LocalSkater owner;
+    Owner owner;
     std::uint64_t until{};
 };
 struct Protection {
@@ -56,6 +59,7 @@ struct Protection {
     std::atomic<bool> ready{};
     SRWLOCK lock = SRWLOCK_INIT;
     Lease lease;
+    std::atomic<NoBailStepObserver> step_observer{};
 };
 Protection& protection() { static auto* value = new Protection; return *value; }
 struct StateWatch {
@@ -66,8 +70,44 @@ struct StateWatch {
 };
 StateWatch& state_watch() { static auto* value = new StateWatch; return *value; }
 
-// The published local skater owns `object` and is protected right now.
-bool protected_owner(std::uintptr_t object, std::uintptr_t LocalSkater::* member, LocalSkater* owner = nullptr) noexcept {
+// Recheck live local ownership at use time. A retained physics address alone
+// must never protect another skater after a respawn or level change.
+bool resolve(std::uintptr_t client, std::uintptr_t entity, Owner& o) noexcept {
+    const auto base = protection().base;
+    unsigned state{}, manager_offset{};
+    if (pointer(client) != base + addr::engine::client_vtable || !read(client + 0xc4, state) ||
+        (state != 13 && state != 21) || pointer(entity) != base + addr::engine::skater_entity_vtable ||
+        !read(base + addr::engine::context_player_manager_offset, manager_offset) || manager_offset > 0x1000000) return false;
+    const auto context = pointer(client, 8);
+    const auto manager = pointer(context, manager_offset);
+    const auto begin = pointer(manager, 0x4c8), end = pointer(manager, 0x4d0);
+    if (!context || pointer(entity, 0x20) != context || pointer(manager) != base + addr::engine::local_player_manager_vtable ||
+        !begin || end != begin + 8) return false;
+    o.player = pointer(begin);
+    std::uint8_t local{}, remote{}, teleport{};
+    if (pointer(o.player) != base + addr::engine::local_player_vtable || pointer(o.player, 0x78) != context ||
+        !read(o.player + 0x45, local) || local != 1 || !read(o.player + 0x44, remote) || remote ||
+        pointer(o.player, 0xb8) != entity || pointer(entity, 0xf8) != o.player ||
+        !read(entity + 0x7e0, teleport) || teleport) return false;
+    o.handle = pointer(o.player, 0xb0);
+    const auto collection = pointer(entity, 0x70);
+    o.component = pointer(entity, 0x628);
+    o.core = pointer(o.component, 0x70);
+    o.context = pointer(o.core, 0x3c0);
+    o.selector = pointer(o.core, 0x440);
+    o.causes = pointer(o.core, 0x428);
+    o.rig = pointer(o.core, 0x438);
+    if (pointer(o.handle) != entity + 8 || pointer(collection) != entity ||
+        pointer(o.component) != base + addr::engine::skater_component_vtable || pointer(o.component, 0x18) != collection ||
+        pointer(o.core) != base + bail_core_vtable || !o.context || !o.selector ||
+        pointer(o.selector, 8) != o.context || pointer(o.causes, 0x20) != o.context || pointer(o.rig) != o.context || pointer(o.rig, 0x4630) != o.core)
+        return false;
+    o.client = client;
+    o.entity = entity;
+    return true;
+}
+// The published owner owns `object` (while `protecting`, only with a protection window open).
+bool published_owner(std::uintptr_t object, std::uintptr_t Owner::* member, Owner* owner, bool protecting) noexcept {
     auto& p = protection();
     if (!p.ready.load(std::memory_order_acquire)) return false;
     // The lock only copies SDK data, and is never held across native code or
@@ -75,7 +115,17 @@ bool protected_owner(std::uintptr_t object, std::uintptr_t LocalSkater::* member
     AcquireSRWLockShared(&p.lock);
     const auto lease = p.lease;
     ReleaseSRWLockShared(&p.lock);
-    return lease.active(GetTickCount64()) && local_skater_owns(object, member, owner);
+    if ((protecting && !lease.active(GetTickCount64())) || object != lease.owner.*member) return false;
+    Owner current;
+    if (!resolve(lease.owner.client, lease.owner.entity, current) || current != lease.owner) return false;
+    if (owner) *owner = current;
+    return true;
+}
+bool protected_owner(std::uintptr_t object, std::uintptr_t Owner::* member, Owner* owner = nullptr) noexcept {
+    return published_owner(object, member, owner, true);
+}
+NoBailSkater skater_of(const Owner& owner) noexcept {
+    return {protection().base, owner.entity, owner.core, owner.context, owner.rig};
 }
 bool cancel_request(std::uintptr_t context, std::uintptr_t offset, LONG mask) noexcept {
     const auto address = context + offset;
@@ -103,9 +153,9 @@ bool reset_pending_causes(std::uintptr_t causes) noexcept {
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
 }
-bool filter_requests(std::uintptr_t object, std::uintptr_t LocalSkater::* member) noexcept {
+bool filter_requests(std::uintptr_t object, std::uintptr_t Owner::* member) noexcept {
     LastError error;
-    LocalSkater owner;
+    Owner owner;
     // Native collision/landing checks also write the collector inline. Reset
     // it at each consumer, after those writes, before either animation's bail
     // or recover/runout query. Filtering record_cause alone misses this path.
@@ -114,8 +164,8 @@ bool filter_requests(std::uintptr_t object, std::uintptr_t LocalSkater::* member
 }
 bool suppress_cause(std::uintptr_t causes, std::int32_t reason, std::uintptr_t caller) noexcept {
     LastError error;
-    LocalSkater owner;
-    if (!protected_owner(causes, &LocalSkater::causes, &owner)) return false;
+    Owner owner;
+    if (!protected_owner(causes, &Owner::causes, &owner)) return false;
     for (const auto& impact : impact_bail_calls) {
         if (caller == protection().base + impact.return_rva && reason == impact.reason)
             return cancel_impact_request(owner.context);
@@ -139,9 +189,8 @@ void hold_off_board(std::uintptr_t selector, std::uint32_t current) noexcept {
     const auto board = p.board;
     ReleaseSRWLockShared(&p.lock);
     if (GetTickCount64() >= board.until || selector != board.owner.selector) return;
-    LocalSkater current_owner;
-    if (!resolve_local_skater(p.base, board.owner.client, board.owner.entity, current_owner) || current_owner != board.owner)
-        return;
+    Owner current_owner;
+    if (!resolve(board.owner.client, board.owner.entity, current_owner) || current_owner != board.owner) return;
     (void)cancel_request(current_owner.context, animation_request_offset, mount_request_mask);
 }
 std::uint32_t choose_state(std::uintptr_t selector, std::uint32_t current) {
@@ -152,10 +201,10 @@ std::uint32_t choose_state(std::uintptr_t selector, std::uint32_t current) {
     // Clear shared requests before selection so native ground/air/walking
     // transitions can still run. Some contact tests return Wipeout directly;
     // retain the current state only for that result, never ordinary Offboard.
-    const bool filtered = filter_requests(selector, &LocalSkater::selector);
+    const bool filtered = filter_requests(selector, &Owner::selector);
     const auto next = protection().choose_original(selector, current);
     LastError error;
-    const auto chosen = filtered && next == wipeout_physics_state && protected_owner(selector, &LocalSkater::selector) ? current : next;
+    const auto chosen = filtered && next == wipeout_physics_state && protected_owner(selector, &Owner::selector) ? current : next;
     auto& w = state_watch();
     if (selector == w.selector.load(std::memory_order_acquire) && GetTickCount64() < w.until.load(std::memory_order_acquire)) {
         if (const auto before = w.state.exchange(chosen, std::memory_order_acq_rel); before != chosen) {
@@ -172,9 +221,12 @@ std::uint32_t choose_state(std::uintptr_t selector, std::uint32_t current) {
 void skeleton_response(std::uintptr_t rig, float seconds, bool wipeout) {
     // The state post-update can raise another request after the selector ran.
     // Filter at this consumer, then let native constraints and recovery run.
-    if (filter_requests(rig, &LocalSkater::rig)) wipeout = false;
-    // The body's observers see the step as the skeleton will: a filtered wipeout never happened.
-    skater_body::on_physics_step(rig, seconds, wipeout);
+    if (filter_requests(rig, &Owner::rig)) wipeout = false;
+    if (const auto observer = protection().step_observer.load(std::memory_order_acquire)) {
+        LastError error;
+        Owner owner;
+        if (published_owner(rig, &Owner::rig, &owner, false)) observer(skater_of(owner), seconds, wipeout);
+    }
     protection().skeleton_original(rig, seconds, wipeout);
 }
 bool clear_contact_output(std::uintptr_t contacts) noexcept {
@@ -186,9 +238,9 @@ bool clear_contact_output(std::uintptr_t contacts) noexcept {
 }
 void filter_contact_animation(std::uintptr_t core) noexcept {
     LastError error;
-    LocalSkater owner;
+    Owner owner;
     std::uint32_t state{};
-    if (!protected_owner(core, &LocalSkater::core, &owner) || !read(owner.context + 0x1414, state)) return;
+    if (!protected_owner(core, &Owner::core, &owner) || !read(owner.context + 0x1414, state)) return;
     // Ground/air and grind state families. Offboard, mounting, handplants and
     // existing ragdolls retain their native contact reporting and recovery.
     if (!((state >= 100 && state < 300) || (state >= 400 && state < 500))) return;
@@ -207,7 +259,7 @@ void publish_animation(std::uintptr_t core) {
     // Clear flags and pending causes before native publication, including
     // its early recovery query and cause export. Leave the native query result
     // unchanged: forcing it true used to put the skater into a stumbling state.
-    (void)filter_requests(core, &LocalSkater::core);
+    (void)filter_requests(core, &Owner::core);
     protection().publish_original(core);
     filter_contact_animation(core);
 }
@@ -298,17 +350,19 @@ bool start_no_bail(std::uintptr_t base) noexcept {
     return false;
 }
 bool no_bail_available() noexcept { return protection().ready.load(std::memory_order_acquire); }
-bool update_no_bail(bool manual, bool flying, std::uint64_t flight_expires) noexcept {
+bool update_no_bail(std::uintptr_t client, std::uintptr_t entity, bool manual,
+    bool flying, std::uint64_t flight_expires) noexcept {
+    LastError error;
     auto& p = protection();
-    const bool available = p.ready.load(std::memory_order_acquire);
     Lease next;
+    const bool available = p.ready.load(std::memory_order_acquire) && resolve(client, entity, next.owner);
     if (available) {
         const auto now = GetTickCount64();
         next.manual_until = manual ? now + 500 : 0;
         next.flight_until = flying ? flight_expires : 0;
     }
     AcquireSRWLockExclusive(&p.lock);
-    p.lease = next;
+    p.lease = available ? next : Lease{};
     ReleaseSRWLockExclusive(&p.lock);
     return available;
 }
@@ -327,7 +381,7 @@ void update_board_lock(std::uintptr_t client, std::uintptr_t entity, bool locked
         // The owner does not resolve while a teleport is under way: the last one stands
         // until it expires.
         BoardLock next;
-        if (resolve_local_skater(p.base, client, entity, next.owner)) {
+        if (resolve(client, entity, next.owner)) {
             next.until = GetTickCount64() + 500;
             AcquireSRWLockExclusive(&p.lock);
             p.board = next;
@@ -341,8 +395,8 @@ void update_board_lock(std::uintptr_t client, std::uintptr_t entity, bool locked
     ReleaseSRWLockExclusive(&p.lock);
     // Released: teleports that keep the skater's own choice (the SDK's /tp) put it on the
     // board again. Once the skater resolves, outside a teleport.
-    LocalSkater owner;
-    if (rearm && resolve_local_skater(p.base, client, entity, owner) && set_teleport_on_board(owner.component)) rearm = false;
+    Owner owner;
+    if (rearm && resolve(client, entity, owner) && set_teleport_on_board(owner.component)) rearm = false;
 }
 void clear_no_bail() noexcept {
     auto& p = protection();
@@ -350,11 +404,24 @@ void clear_no_bail() noexcept {
     p.lease = {};
     ReleaseSRWLockExclusive(&p.lock);
 }
+bool no_bail_skater(NoBailSkater& skater) noexcept {
+    auto& p = protection();
+    if (!p.ready.load(std::memory_order_acquire)) return false;
+    AcquireSRWLockShared(&p.lock);
+    const auto published = p.lease.owner;
+    ReleaseSRWLockShared(&p.lock);
+    Owner current;
+    if (!published.entity || !resolve(published.client, published.entity, current) || current != published) return false;
+    skater = skater_of(current);
+    return true;
+}
+void set_no_bail_step_observer(NoBailStepObserver observer) noexcept {
+    protection().step_observer.store(observer, std::memory_order_release);
+}
 void watch_physics_state(std::uintptr_t client, std::uintptr_t entity) noexcept {
     auto& w = state_watch();
-    auto& p = protection();
-    LocalSkater owner;
-    if (!p.ready.load(std::memory_order_acquire) || !resolve_local_skater(p.base, client, entity, owner)) return;
+    Owner owner;
+    if (!protection().ready.load(std::memory_order_acquire) || !resolve(client, entity, owner)) return;
     if (w.selector.exchange(owner.selector, std::memory_order_acq_rel) != owner.selector)
         w.state.store(0, std::memory_order_release);
     w.until.store(GetTickCount64() + 500, std::memory_order_release);

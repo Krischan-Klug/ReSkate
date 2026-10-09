@@ -1,4 +1,4 @@
-#include "local_skater_render.h"
+#include "hall_of_meat_render.h"
 #include "Engine/Core/Hooks/hooks.h"
 #include "Engine/Core/Log/logging.h"
 #include "Engine/Core/Platform/memory.h"
@@ -6,7 +6,7 @@
 #include "Engine/Game/Build/20260929/skater_render.h"
 #include "Engine/Game/Rendering/draw_packet.h"
 #include "Engine/Game/UI/game_view.h"
-#include "Extension/Skater/local_skater.h"
+#include "Extension/Skater/no_bail.h"
 #include <Windows.h>
 #include <atomic>
 #include <bit>
@@ -15,7 +15,7 @@
 #include <mutex>
 #include <numbers>
 
-namespace dingosdk::skater_render {
+namespace dingosdk::hall_of_meat {
 namespace {
 namespace build = addr::skater_render;
 using DrawPacket = void (*)(std::uintptr_t object, std::uintptr_t packet);
@@ -108,7 +108,7 @@ void observe_packet(std::uintptr_t object, std::uintptr_t packet) {
     }
     if (!s.found_logged.exchange(true))
         logging::log(logging::Level::info, logging::Channel::graphics,
-            "Skater render: drawing the local skater (render object {}, {} bones).", index, count);
+            "Hall of Meat: the renderer draws the local skater (render object {}, {} bones).", index, count);
 }
 void draw_packet_hook(std::uintptr_t object, std::uintptr_t packet) {
     auto& s = state();
@@ -166,14 +166,14 @@ void render_view_hook(std::uintptr_t blackboard, std::uintptr_t current, std::ui
 }
 }
 
-bool start(std::uintptr_t base) noexcept {
+bool start_render(std::uintptr_t base) noexcept {
     auto& s = state();
     if (s.ready.load(std::memory_order_acquire)) return s.base == base;
     for (const auto& contract : build::contracts) {
         std::array<unsigned char, 32> actual{};
         if (!memory::peek(base + contract.rva, actual) || actual != contract.bytes) {
             logging::log(logging::Level::warning, logging::Channel::graphics,
-                "Skater render is unavailable: the native contract at 0x{:x} did not match.", contract.rva);
+                "Hall of Meat cannot see where the skater is drawn: the native contract at 0x{:x} did not match.", contract.rva);
             return false;
         }
     }
@@ -207,24 +207,22 @@ bool start(std::uintptr_t base) noexcept {
         }
     }
     logging::log(logging::Level::warning, logging::Channel::graphics,
-        "Skater render hook setup failed (status {}).", static_cast<LONG>(status));
+        "Hall of Meat cannot see where the skater is drawn: hooking the renderer failed (status {}).", static_cast<LONG>(status));
     while (prepared) (void)hook_remove(targets[--prepared]);
     return false;
 }
 
-bool available() noexcept { return state().ready.load(std::memory_order_acquire); }
-
-void on_client_tick() noexcept {
+void follow_render() noexcept {
     auto& s = state();
     if (!s.ready.load(std::memory_order_acquire)) return;
-    LocalSkater skater;
-    if (!current_local_skater(skater)) return;
+    NoBailSkater skater;
+    if (!no_bail_skater(skater)) return;
     for (std::size_t mode = 0; mode < build::render_modes; ++mode)
         s.indices[mode].store(render_index(s.base, skater.entity, mode), std::memory_order_release);
     s.indices_until.store(GetTickCount64() + lease_ms, std::memory_order_release);
 }
 
-bool latest(Picture& picture) noexcept {
+bool latest_picture(Picture& picture) noexcept {
     auto& s = state();
     const auto now = GetTickCount64();
     std::lock_guard guard(s.lock);

@@ -1,6 +1,6 @@
 // The Hall of Meat model, with made-up physics steps, and its score card.
-#include "Extension/Skater/hall_of_meat_card.h"
-#include "Extension/Skater/hall_of_meat_model.h"
+#include "Extension/HallOfMeat/hall_of_meat_card.h"
+#include "Extension/HallOfMeat/hall_of_meat_model.h"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -482,39 +482,27 @@ void a_bail_lasts_through_its_flights() {
 }
 
 void the_card_shows_the_bail() {
-    const auto images = card_images();
-    check(images.size() == 13, "eight icons, the logo and four shapes");
-    const auto added = [&](const std::string& key) {
-        return std::count_if(images.begin(), images.end(), [&](const auto& image) { return image.key == key; }) == 1;
-    };
-    for (const auto& image : images) {
-        check(image.colours != overlay::GameImageColours::original && image.side > 0 && !image.name.empty(),
-            "white to be tinted, from a texture");
-        check(added(image.key), "each under its own key");
-    }
+    check(grouped(0) == "0" && grouped(999) == "999" && grouped(1000) == "1,000" && grouped(1234567) == "1,234,567",
+        "thousands grouped");
+    check(grouped(-1234) == "-1,234", "a negative number too");
     Game tracker;
-    check(score_card(tracker.view(t0), {}).opacity == 0 && score_card(tracker.view(t0), {}).rows.empty(), "no card while riding");
+    check(card(tracker.view(t0), {}).opacity == 0 && card(tracker.view(t0), {}).rows.empty(), "no card while riding");
     tracker.step(t0, hit(Bone::neck1, broken_speed + 1.0f, true)); // the head breaks
     tracker.step(t0 + 16, hit(Bone::left_hand, hit_speed + 1.0f));
     tracker.step(keep(tracker, t0 + 32, 1456, lying()) + 12, lying()); // the last step at t0 + 1500
     const auto view = tracker.view(t0 + 1500);
-    auto card = score_card(view, standing(0, view.tally.score));
-    check(near(card.opacity, 1.0f) && card.total == view.tally.score && card.title == "Hall of Meat" && added(card.logo) &&
-              card.logo_clear < 1,
-        "the Meat under the logo, its title in the arch, every stat counted");
-    const auto& skin = card.skin;
-    check(added(skin.row) && added(skin.panel) && added(skin.scratches) && added(skin.underline),
-        "drawn with the shapes it adds");
-    check(card.rows.size() == 1 && card.rows[0].key == "time" && card.rows[0].value == "1.5 s" &&
-              card.rows[0].points == static_cast<int>(1.5f * points_per_second + 0.5f),
+    auto shown = card(view, standing(0, view.tally.score));
+    check(near(shown.opacity, 1.0f) && shown.total == view.tally.score, "the Meat, every stat counted");
+    check(shown.rows.size() == 1 && shown.rows[0].stat == Stat::time && shown.rows[0].value == "1.5 s" &&
+              shown.rows[0].points == static_cast<int>(1.5f * points_per_second + 0.5f),
         "a small bail shows its time alone");
-    check(card.badge == "NEW BEST" && card.highlight, "the map's first bail sets its best");
-    card = score_card(view, standing(99999, view.tally.score));
-    check(card.badge == "BEST 99,999" && !card.highlight, "a smaller one shows the best");
-    check(score_card(view, {}).badge.empty(), "an unknown best shows none");
+    check(shown.badge == "NEW BEST" && shown.highlight, "the map's first bail sets its best");
+    shown = card(view, standing(99999, view.tally.score));
+    check(shown.badge == "BEST 99,999" && !shown.highlight, "a smaller one shows the best");
+    check(card(view, {}).badge.empty(), "an unknown best shows none");
     tracker.step(t0 + 1500, standing_up());
-    check(near(score_card(tracker.view(t0 + 1500 + linger_ms / 2), {}).opacity, 1.0f), "the card stays once the skater gets up");
-    check(near(score_card(tracker.view(t0 + 1500 + linger_ms + fade_ms / 2), {}).opacity, 0.5f), "then fades");
+    check(near(card(tracker.view(t0 + 1500 + linger_ms / 2), {}).opacity, 1.0f), "the card stays once the skater gets up");
+    check(near(card(tracker.view(t0 + 1500 + linger_ms + fade_ms / 2), {}).opacity, 0.5f), "then fades");
 
     // A big one: off a roof for 3.5 s, five bones broken at 20 m/s, a slide of 5 m.
     Game big;
@@ -530,15 +518,16 @@ void the_card_shows_the_bail() {
     sliding.velocity = game::Vec3{5, 0, 0};
     sliding.spin = 3.0f * radians_per_rotation; // tumbling over three times a second
     now = keep(big, now + 16, 1000, sliding);
-    card = score_card(big.view(now), {});
-    std::vector<std::string> keys;
-    for (const auto& row : card.rows) keys.push_back(row.key);
-    check(keys == std::vector<std::string>{"time", "hits", "broken", "road_rash", "airtime", "fall", "speed", "rotations"},
+    shown = card(big.view(now), {});
+    std::vector<Stat> stats;
+    for (const auto& row : shown.rows) stats.push_back(row.stat);
+    check(stats == std::vector<Stat>{Stat::time, Stat::hits, Stat::broken, Stat::road_rash, Stat::airtime, Stat::fall, Stat::speed,
+                                     Stat::rotations},
         "a big bail shows every stat, in its order");
-    check(card.rows[2].value == "5 broken" && card.rows[2].points == 5 * points_per_break, "the broken bones");
-    check(card.rows[6].value == "44.7 MPH" && card.rows[6].points == static_cast<int>(20.0f * points_per_speed + 0.5f),
+    check(shown.rows[2].value == "5 broken" && shown.rows[2].points == 5 * points_per_break, "the broken bones");
+    check(shown.rows[6].value == "44.7 MPH" && shown.rows[6].points == static_cast<int>(20.0f * points_per_speed + 0.5f),
         "the top speed, in miles per hour");
-    check(card.rows[7].value == "3.0 rotations", "the rotations");
+    check(shown.rows[7].value == "3.0 rotations", "the rotations");
 }
 
 void the_fall_and_the_top_speed_score() {

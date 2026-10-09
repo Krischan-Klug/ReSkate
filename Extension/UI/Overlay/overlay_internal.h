@@ -30,7 +30,6 @@
 #include <deque>
 #include <mutex>
 #include <map>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -274,55 +273,6 @@ void draw_skate_hud();
 // ReSkate's nametags (nametag_overlay.cpp): polled every presented frame.
 bool nametags_pending();
 void draw_nametags();
-// The Hall of Meat skeleton, counter and card (hall_of_meat_overlay.cpp): polled every
-// presented frame.
-bool hall_of_meat_pending();
-void draw_hall_of_meat();
-// skate.'s skeleton mesh as an x-ray over the world (skeleton_overlay.cpp), for any feature: each
-// body in its paint, an opaque colour, from an x-ray's faint middle (solid 0) to solid (1). A body
-// without a paint is not drawn; where it meets a painted one, the painted one fades out.
-struct SkeletonPaint {
-    ImU32 colour{};
-    float solid{};
-};
-using SkeletonPaints = std::array<std::optional<SkeletonPaint>, skater_body::count>;
-void draw_skeleton(const SkeletonFrame& skeleton, const SkeletonPaints& paints, float alpha);
-// `colour` at `opacity` (0 to 1) of its own alpha.
-inline ImU32 scaled_alpha(ImU32 colour, float opacity) {
-    const auto alpha = static_cast<ImU32>(((colour >> IM_COL32_A_SHIFT) & 0xff) * std::clamp(opacity, 0.0f, 1.0f));
-    return (colour & ~IM_COL32_A_MASK) | (alpha << IM_COL32_A_SHIFT);
-}
-// Text over a soft drop shadow, the shadow as see-through as the text.
-inline void shadowed_text(ImDrawList* draw, ImFont* font, float size, ImVec2 at, ImU32 colour, const char* text) {
-    const float offset = std::max(1.0f, size / 16.0f);
-    const float opacity = static_cast<float>((colour >> IM_COL32_A_SHIFT) & 0xff) / 255.0f;
-    draw->AddText(font, size, ImVec2(at.x + offset, at.y + offset), scaled_alpha(IM_COL32_BLACK, opacity * 0.7f), text);
-    draw->AddText(font, size, at, colour, text);
-}
-// The whole screen at `strength` (0 to 1) for any feature (screen_edge_overlay.cpp): darkened a
-// little, its edges washing in from all four sides in `colour`, as a hard hit does.
-void draw_screen_edge(float strength, ImU32 colour);
-// Game images (overlay_images.cpp): their room reserved before the atlas is built, waiting up to
-// `wait` for reads still running, and filled after; then drawn by key in `tint`. False while the
-// image is not in the atlas.
-std::size_t reserve_game_images(ImFontAtlas& atlas, std::chrono::milliseconds wait) noexcept;
-void fill_game_images(ImFontAtlas& atlas) noexcept;
-// Fitted into the box with its aspect kept, centred: an icon, a logo.
-bool draw_game_image(ImDrawList* draw, std::string_view key, ImVec2 min, ImVec2 max, ImU32 tint);
-// Its body (GameImage::body) stretched onto the box, the rest of it around: a brush stroke's bar
-// on the box, its splatter beyond.
-bool draw_game_shape(ImDrawList* draw, std::string_view key, ImVec2 min, ImVec2 max, ImU32 tint);
-// Nine-sliced onto the box: its edges (GameImage::slice) kept `edge` pixels wide, its middle
-// stretched across the rest.
-bool draw_game_panel(ImDrawList* draw, std::string_view key, ImVec2 min, ImVec2 max, float edge, ImU32 tint);
-// A score card (score_card_overlay.cpp) in the bottom left corner. `motion` is the caller's, kept from
-// frame to frame: the total counts up from what it last showed, and a row fades in from when it came.
-struct ScoreCardMotion {
-    float total{};
-    double at{};                          // ImGui time of the last frame drawn
-    std::map<std::string, double> since;  // each row's key: when it came onto the card
-};
-void draw_score_card(const ScoreCard& card, ScoreCardMotion& motion);
 // The profiler's HUD (drawn whenever it is on) and window (only in an interactive frame),
 // perf_overlay.cpp.
 bool perf_hud_pending();

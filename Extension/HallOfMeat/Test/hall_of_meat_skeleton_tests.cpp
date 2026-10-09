@@ -1,17 +1,18 @@
-// The skater's skeleton mesh read from an installed game: dingosdk_skeleton_mesh_tests <Skate folder>.
+// Hall of Meat's skeleton read from an installed game: dingosdk_hall_of_meat_skeleton_tests <Skate folder>.
 // Without a folder there is nothing to read, and it passes.
-#include "Extension/Skater/skeleton_mesh.h"
+#include "Extension/HallOfMeat/hall_of_meat_skeleton.h"
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
 
 using namespace dingosdk;
 using namespace dingosdk::skater_skeleton;
+using dingosdk::hall_of_meat::read_skeleton_mesh;
 namespace {
 void check(bool value, const char* message) { if (!value) throw std::runtime_error(message); }
 
 void the_games_skeleton_reads_and_poses(const char* game_root) {
-    const auto mesh = read_mesh(game_root);
+    const auto mesh = read_skeleton_mesh(game_root);
     check(mesh.vertices.size() == 12222 && mesh.triangles.size() == 13817 * 3, "the level of detail's vertices and triangles");
     for (const auto part : mesh.parts) check(part >= 1 && part < skater_body::count, "every vertex on a body of the skater");
     check(mesh.bone_count == 386, "the render skeleton's bones");
@@ -33,6 +34,6 @@ int main(int argc, char** argv) {
         std::cerr << "FAILED: " << error.what() << '\n';
         return 1;
     }
-    std::cout << "Skeleton mesh tests passed.\n";
+    std::cout << "Hall of Meat skeleton tests passed.\n";
     return 0;
 }
