@@ -53,4 +53,8 @@ inline constexpr std::uint32_t rig_size = 0x5ac0;
 // (skater_pose_update_truck_twist, skater_pose_sum_record_vectors). Its size is not known; 0x400 covers the fields read.
 inline constexpr std::uintptr_t state_pose_offset = 0x10, pose_records_offset = 0x190;
 inline constexpr std::uint32_t pose_bytes = 0x400, pose_record_size = 0x30, pose_records_max = 64;
+// Body list the states write (pose+0x18 -> provider, provider+0x20 -> list): 26 slots of 0x130 B, frame +0x20,
+// dirty flags +0x60, linear velocity +0x70, angular +0x90 (skater_pose_write_primary_body_velocity).
+inline constexpr std::uintptr_t pose_provider_offset = 0x18, provider_body_list_offset = 0x20;
+inline constexpr std::uint32_t body_list_bytes = 26 * 0x130;
 } // namespace dingosdk::game::build::v20260929::skater_step

@@ -246,8 +246,11 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
     }
     if (kind == 1 || kind == 6) {
         // Around the state tick (1 before, 6 after): what the tick reads and writes, to test a state on its own.
-        // POSE is the state's pose helper, PREC its response records (what the tick publishes).
+        // POSE is the state's pose helper, PREC its response records (what the tick publishes), BODY the body list
+        // the tick writes velocities to.
         const auto pose = state ? pointer_at(state + step::state_pose_offset) : 0;
+        const auto provider = pose ? pointer_at(pose + step::pose_provider_offset) : 0;
+        const auto bodies = provider ? pointer_at(provider + step::provider_body_list_offset) : 0;
         std::uintptr_t records = 0;
         std::uint32_t record_bytes = 0;
         if (pose) {
@@ -266,6 +269,7 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
             {tag("TRAJ"), pointer_at(core + step::core_trajectory_offset), step::trajectory_size},
             {tag("POSE"), pose, pose ? step::pose_bytes : 0},
             {tag("PREC"), records, record_bytes},
+            {tag("BODY"), bodies, bodies ? step::body_list_bytes : 0},
         };
         write_record(kind, core, id, tick, std::size(tick));
         return;
