@@ -1,4 +1,5 @@
 #include "debug_tool_internal.h"
+#include "debug_tool.h"
 #include "Engine/Core/Hooks/hooks.h"
 #include "Engine/Core/Platform/memory.h"
 #include "Engine/Game/Build/addresses.h"
@@ -97,11 +98,13 @@ struct Recording {
     FILE* file{};
     std::filesystem::path path;
     std::uint64_t started{}, frequency{};
-    std::atomic<std::uint64_t> bytes{}, steps{};
+    std::atomic<std::uint64_t> bytes{}, steps{}, total_bytes{};
+    std::atomic<int> part{};
+    std::string stem;
     bool tuning_written{};
 } recording;
-constexpr double recording_seconds = 60;
-constexpr std::uint64_t recording_bytes = 400ull << 20;
+// No time limit: the recording runs until switched off; past this size it continues in the next part file.
+constexpr std::uint64_t recording_part_bytes = 400ull << 20;
 constexpr std::uint32_t state_bytes = 0x1000; // the largest state object fits; past its end is other heap
 
 void switch_state(bool on);
@@ -110,7 +113,7 @@ std::string state_status();
 std::string motion_status();
 std::string recording_status();
 
-std::array<Probe, 3> probes{{
+std::array<Probe, 3> probe_list{{
     {"skater.state", "skater", "State changes",
      "Each change of the local skater's physics state (ROLL_IN, PHYSICS_AIR, ...) and how long the last one lasted.",
      {}, [] { return hooked.load(); }, &switch_state, &state_status},
@@ -118,12 +121,12 @@ std::array<Probe, 3> probes{{
      "Position, velocity and speed from the skater's ctx, ten times per second.",
      {}, [] { return hooked.load(); }, nullptr, &motion_status},
     {"skater.step", "skater", "Step recording",
-     "Every physics step: core, ctx, rig, state, controller and outputs before and after, and what the state choice reads, to logs/step-*.rsrec (60 s max).",
+     "Every physics step: core, ctx, rig, state, controller and outputs before and after, and what the state choice reads, to logs/step-*.rsrec until stopped (F9 or the DEBUG window; parts of 400 MB).",
      {}, [] { return hooked.load(); }, &switch_recording, &recording_status},
 }};
-Probe& state_probe = probes[0];
-Probe& motion_probe = probes[1];
-Probe& step_probe = probes[2];
+Probe& state_probe = probe_list[0];
+Probe& motion_probe = probe_list[1];
+Probe& step_probe = probe_list[2];
 
 void switch_state(bool on) {
     if (on) state_watch.id = -2;
@@ -179,49 +182,65 @@ void write_record(std::uint32_t kind, std::uintptr_t core, int state, const Sect
     if (kind == 2) ++recording.steps;
 }
 
-void switch_recording(bool on) {
-    auto& r = recording;
-    if (on) {
-        SYSTEMTIME t;
-        GetLocalTime(&t);
-        char name[64];
-        std::snprintf(name, sizeof name, "step-%04u%02u%02u-%02u%02u%02u.rsrec", t.wYear, t.wMonth, t.wDay,
-            t.wHour, t.wMinute, t.wSecond);
-        std::lock_guard guard(r.lock);
-        r.path = logging::status().directory / name;
-        if (_wfopen_s(&r.file, r.path.c_str(), L"wb") != 0 || !r.file) {
-            r.file = nullptr;
-            report(step_probe, "cannot write {}", r.path.string());
-            return;
-        }
-        std::setvbuf(r.file, nullptr, _IOFBF, 8 << 20);
-        LARGE_INTEGER frequency{};
-        QueryPerformanceFrequency(&frequency);
-        r.frequency = std::uint64_t(frequency.QuadPart);
-        const std::uint32_t version = 1, reserved = 0;
-        const std::uint64_t base = image_base;
-        std::fwrite("RSKSTEP1", 1, 8, r.file);
-        std::fwrite(&version, 4, 1, r.file);
-        std::fwrite(&reserved, 4, 1, r.file);
-        std::fwrite(&base, 8, 1, r.file);
-        std::fwrite(&r.frequency, 8, 1, r.file);
-        r.bytes = 32;
-        r.steps = 0;
-        r.tuning_written = false;
-        r.started = now();
-        report(step_probe, "recording to {}", r.path.string());
-        return;
+// Opens the current part (caller holds the lock). Part 1 is step-<time>.rsrec, later parts step-<time>-pN.rsrec;
+// every part is a complete recording with its own header and tuning.
+bool open_part(Recording& r) {
+    const auto part = r.part.load();
+    const auto name = part <= 1 ? r.stem + ".rsrec" : std::format("{}-p{}.rsrec", r.stem, part);
+    r.path = logging::status().directory / name;
+    if (_wfopen_s(&r.file, r.path.c_str(), L"wb") != 0 || !r.file) {
+        r.file = nullptr;
+        report(step_probe, "cannot write {}", r.path.string());
+        return false;
     }
-    std::lock_guard guard(r.lock);
+    std::setvbuf(r.file, nullptr, _IOFBF, 8 << 20);
+    const std::uint32_t version = 1, reserved = 0;
+    const std::uint64_t base = image_base;
+    std::fwrite("RSKSTEP1", 1, 8, r.file);
+    std::fwrite(&version, 4, 1, r.file);
+    std::fwrite(&reserved, 4, 1, r.file);
+    std::fwrite(&base, 8, 1, r.file);
+    std::fwrite(&r.frequency, 8, 1, r.file);
+    r.bytes = 32;
+    r.tuning_written = false;
+    return true;
+}
+
+void close_part(Recording& r) {
     if (!r.file) return;
     std::fclose(r.file);
     r.file = nullptr;
-    report(step_probe, "saved {} steps, {:.1f} MB: {}", r.steps.load(), double(r.bytes.load()) / (1 << 20), r.path.string());
+    r.total_bytes += r.bytes.load();
+    report(step_probe, "saved part {}, {:.1f} MB: {}", r.part.load(), double(r.bytes.load()) / (1 << 20), r.path.string());
+}
+
+void switch_recording(bool on) {
+    auto& r = recording;
+    std::lock_guard guard(r.lock);
+    if (on) {
+        SYSTEMTIME t;
+        GetLocalTime(&t);
+        r.stem = std::format("step-{:04}{:02}{:02}-{:02}{:02}{:02}", t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond);
+        LARGE_INTEGER frequency{};
+        QueryPerformanceFrequency(&frequency);
+        r.frequency = std::uint64_t(frequency.QuadPart);
+        r.part = 1;
+        r.steps = 0;
+        r.total_bytes = 0;
+        if (!open_part(r)) return;
+        r.started = now();
+        report(step_probe, "recording to {} (until stopped)", r.path.string());
+        return;
+    }
+    if (!r.file) return;
+    close_part(r);
+    report(step_probe, "recording stopped: {} steps, {} part(s), {:.1f} MB", r.steps.load(), r.part.load(),
+        double(r.total_bytes.load()) / (1 << 20));
 }
 std::string recording_status() {
     if (!recording.frequency) return {};
-    return std::format("{:.0f} s, {} steps, {:.0f} MB", double(now() - recording.started) / double(recording.frequency),
-        recording.steps.load(), double(recording.bytes.load()) / (1 << 20));
+    return std::format("{:.0f} s, {} steps, {:.0f} MB, part {}", double(now() - recording.started) / double(recording.frequency),
+        recording.steps.load(), double(recording.total_bytes.load() + recording.bytes.load()) / (1 << 20), recording.part.load());
 }
 
 // A 2D curve flattened for the recording: u32 count, then per inner curve f32 outer key, u32 points, points (0x1c B each).
@@ -291,10 +310,17 @@ std::vector<unsigned char> torque_queue_bytes(std::uintptr_t bodies) {
 
 void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, int id, std::uintptr_t ctx) {
     auto& r = recording;
-    if (r.frequency && (double(now() - r.started) / double(r.frequency) > recording_seconds || r.bytes > recording_bytes)) {
-        step_probe.enabled.store(false);
-        switch_recording(false);
-        return;
+    if (kind == 1 && r.bytes > recording_part_bytes) {
+        // Continue in the next part at a tick boundary, so a tick's records stay in one file.
+        std::lock_guard guard(r.lock);
+        if (r.file) {
+            close_part(r);
+            ++r.part;
+            if (!open_part(r)) {
+                step_probe.enabled.store(false);
+                return;
+            }
+        }
     }
     bool tuning_due;
     {
@@ -484,7 +510,18 @@ bool fingerprint(std::uintptr_t address, const game::build::Fingerprint& expecte
 }
 }
 
-std::span<Probe> skater_probes() { return probes; }
+std::span<Probe> skater_probes() { return probe_list; }
+
+RecordingInfo recording_info() noexcept {
+    RecordingInfo info;
+    info.active = step_probe.enabled.load() && recording.file != nullptr;
+    if (!info.active || !recording.frequency) return info;
+    info.seconds = double(now() - recording.started) / double(recording.frequency);
+    info.megabytes = double(recording.total_bytes.load() + recording.bytes.load()) / (1 << 20);
+    info.steps = recording.steps.load();
+    info.part = recording.part.load();
+    return info;
+}
 
 bool start_skater_probes(std::uintptr_t base) noexcept {
     if (hooked.load()) return true;

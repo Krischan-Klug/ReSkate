@@ -3,7 +3,6 @@
 #include "overlay_internal.h"
 #include "Extension/Console/commands.h"
 #include "console_suggestions.h"
-#include "Extension/DebugTool/debug_tool_console.h"
 
 namespace dingosdk::overlay::detail {
 
@@ -321,24 +320,6 @@ bool console_chip(ImDrawList* draw, const char* label, std::size_t count, bool& 
     return pressed;
 }
 
-// LOG / DEBUG: the console's two tabs, as tiles like the severity chips.
-bool console_tab(ImDrawList* draw, const char* label, bool selected, float k, unsigned seed) {
-    auto& s = state();
-    const auto extent = s.menu.bold->CalcTextSizeA(14 * k, FLT_MAX, 0, label);
-    const ImVec2 size(extent.x + 28 * k, ImGui::GetFrameHeight());
-    const auto at = ImGui::GetCursorScreenPos();
-    ImGui::PushID(label);
-    const bool pressed = ImGui::InvisibleButton("##tab", size);
-    const bool hovered = ImGui::IsItemHovered();
-    ImGui::PopID();
-    using namespace dingosdk::overlay::theme;
-    dingosdk::skate_theme::rough_rect(draw, at, ImVec2(at.x + size.x, at.y + size.y),
-        selected ? paper : hovered ? dingosdk::skate_theme::tile_light : dingosdk::skate_theme::tile_grey, seed, k);
-    draw->AddText(s.menu.bold, 14 * k, ImVec2(at.x + 14 * k, at.y + (size.y - extent.y) * .5f),
-        selected ? dingosdk::skate_theme::black : muted, label);
-    return pressed;
-}
-
 // The OPTIONS panel: a styled drop-down under the button, laid out like the
 // menu's pages instead of ImGui's default menu.
 void draw_console_options(ImVec2 corner, float k) {
@@ -510,22 +491,17 @@ void draw_console() {
             else if (line.entry.severity == Severity::error || line.entry.severity == Severity::critical) ++errors;
             else ++infos;
         }
-        if (console_tab(body, "LOG", !s.console_debug_tab, k, 24)) s.console_debug_tab = false;
+        console_chip(body, "MESSAGES", infos, s.console_show_info, k, 21);
         ImGui::SameLine(0, P(6));
-        if (console_tab(body, "DEBUG", s.console_debug_tab, k, 25)) s.console_debug_tab = true;
-        if (!s.console_debug_tab) {
-            ImGui::SameLine(0, P(18));
-            console_chip(body, "MESSAGES", infos, s.console_show_info, k, 21);
-            ImGui::SameLine(0, P(6));
-            console_chip(body, "WARNINGS", warnings, s.console_show_warnings, k, 22);
-            ImGui::SameLine(0, P(6));
-            console_chip(body, "ERRORS", errors, s.console_show_errors, k, 23);
-            ImGui::SameLine(0, P(12));
-            const float options_width = s.menu.bold->CalcTextSizeA(P(15), FLT_MAX, 0, "OPTIONS").x + P(24);
-            s.console_filter.Draw("##Console filter", ImGui::GetContentRegionAvail().x - options_width - P(8));
-            if (!s.console_filter.IsActive() && !ImGui::IsItemActive()) {
-                const auto at = ImGui::GetItemRectMin();
-                body->AddText(s.menu.body, P(16), ImVec2(at.x + P(9), at.y + P(6)), muted, "Filter messages...");
+        console_chip(body, "WARNINGS", warnings, s.console_show_warnings, k, 22);
+        ImGui::SameLine(0, P(6));
+        console_chip(body, "ERRORS", errors, s.console_show_errors, k, 23);
+        ImGui::SameLine(0, P(12));
+        const float options_width = s.menu.bold->CalcTextSizeA(P(15), FLT_MAX, 0, "OPTIONS").x + P(24);
+        s.console_filter.Draw("##Console filter", ImGui::GetContentRegionAvail().x - options_width - P(8));
+        if (!s.console_filter.IsActive() && !ImGui::IsItemActive()) {
+            const auto at = ImGui::GetItemRectMin();
+            body->AddText(s.menu.body, P(16), ImVec2(at.x + P(9), at.y + P(6)), muted, "Filter messages...");
         }
         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Search messages or sources. Use -text to exclude matches.");
         ImGui::SameLine(0, P(8));
@@ -534,7 +510,6 @@ void draw_console() {
         ImGui::PopFont();
         const auto options_corner = ImGui::GetItemRectMax();
         draw_console_options(options_corner, k);
-        }
 
         ImGui::PushFont(s.menu.mono);
         s.console_suggestions = s.console_input[0]
@@ -561,12 +536,10 @@ void draw_console() {
         for (std::size_t i = 0; i < s.console_lines.size(); ++i)
             if (console_row_matches(s.console_lines[i])) filtered.push_back(i);
 
-        if (s.console_debug_tab) dingosdk::overlay::draw_debug_tool(k, scrollback_height, s.menu.bold, s.menu.body);
-        else {
-            // Scrollback on a rough-cut tile, like the menu's panels.
-            {
-                const auto at = ImGui::GetCursorScreenPos();
-                skate::rough_rect(body, at, ImVec2(at.x + ImGui::GetContentRegionAvail().x, at.y + scrollback_height), skate::tile, 31, k);
+        // Scrollback on a rough-cut tile, like the menu's panels.
+        {
+            const auto at = ImGui::GetCursorScreenPos();
+            skate::rough_rect(body, at, ImVec2(at.x + ImGui::GetContentRegionAvail().x, at.y + scrollback_height), skate::tile, 31, k);
         }
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, panel_padding);
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(P(4), P(3)));
@@ -593,7 +566,6 @@ void draw_console() {
         }
         ImGui::EndChild();
         ImGui::PopStyleVar(2);
-        }
 
         if (suggestions_open) {
             const auto at = ImGui::GetCursorScreenPos();

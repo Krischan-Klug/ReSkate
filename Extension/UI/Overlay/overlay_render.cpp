@@ -1,3 +1,4 @@
+#include "Extension/DebugTool/debug_tool_console.h"
 #include "Engine/Core/Platform/launcher_support.h"
 #include "Engine/Core/Log/logging.h"
 #include "Engine/Core/Profiling/profiler.h"
@@ -544,6 +545,7 @@ void render(IDXGISwapChain* presented, UINT flags) {
     if (menu_frame) {
         draw_menu();
         draw_console();
+        dingosdk::overlay::draw_debug_window();
         draw_perf_window();
     }
     draw_hall_of_meat();
@@ -551,6 +553,7 @@ void render(IDXGISwapChain* presented, UINT flags) {
     draw_game_text();
     draw_skate_hud();
     draw_perf_hud();
+    dingosdk::overlay::draw_debug_hud();
     draw_trainer_hud();
     draw_notices();
     draw_chat();
