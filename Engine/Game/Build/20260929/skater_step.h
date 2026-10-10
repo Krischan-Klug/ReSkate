@@ -57,4 +57,9 @@ inline constexpr std::uint32_t pose_bytes = 0x400, pose_record_size = 0x30, pose
 // dirty flags +0x60, linear velocity +0x70, angular +0x90 (skater_pose_write_primary_body_velocity).
 inline constexpr std::uintptr_t pose_provider_offset = 0x18, provider_body_list_offset = 0x20;
 inline constexpr std::uint32_t body_list_bytes = 26 * 0x130;
+// Bound instances the ground responses read (re/controller/states/physics_ground.md): defaults ctx+0x1440 (+0x1e4..+0x1f4),
+// runtime tuning ctx+0x1448 (+0x14/+0x1c/+0x20), 412f194a ctx+0x1468, 47bd7711 ctx+0x1498. Sizes not known; 0x400 each.
+inline constexpr std::uintptr_t ctx_defaults_offset = 0x1440, ctx_runtime_tuning_offset = 0x1448,
+    ctx_instance_1468_offset = 0x1468, ctx_instance_1498_offset = 0x1498;
+inline constexpr std::uint32_t bound_instance_bytes = 0x400;
 } // namespace dingosdk::game::build::v20260929::skater_step

@@ -270,6 +270,10 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
             {tag("POSE"), pose, pose ? step::pose_bytes : 0},
             {tag("PREC"), records, record_bytes},
             {tag("BODY"), bodies, bodies ? step::body_list_bytes : 0},
+            {tag("I440"), ctx ? pointer_at(ctx + step::ctx_defaults_offset) : 0, step::bound_instance_bytes},
+            {tag("I448"), ctx ? pointer_at(ctx + step::ctx_runtime_tuning_offset) : 0, step::bound_instance_bytes},
+            {tag("I468"), ctx ? pointer_at(ctx + step::ctx_instance_1468_offset) : 0, step::bound_instance_bytes},
+            {tag("I498"), ctx ? pointer_at(ctx + step::ctx_instance_1498_offset) : 0, step::bound_instance_bytes},
         };
         write_record(kind, core, id, tick, std::size(tick));
         return;
