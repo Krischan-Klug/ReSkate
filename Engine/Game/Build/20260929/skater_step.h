@@ -56,6 +56,9 @@ inline constexpr std::uint32_t pose_bytes = 0x400, pose_record_size = 0x30, pose
 // Body list the states write (pose+0x18 -> provider, provider+0x20 -> list): 26 slots of 0x130 B, frame +0x20,
 // dirty flags +0x60, linear velocity +0x70, angular +0x90 (skater_pose_write_primary_body_velocity).
 inline constexpr std::uintptr_t pose_provider_offset = 0x18, provider_body_list_offset = 0x20;
+// The pose's virtual +0x10 returns the board body's local centre of mass (the point of the friction record, channel 6);
+// +0x20 sets it (the slide pivot). Signature: Vec4* (pose*, Vec4* out).
+inline constexpr std::uintptr_t pose_get_center_of_mass_slot = 0x10;
 inline constexpr std::uint32_t body_list_bytes = 26 * 0x130;
 // The board proxy's torque queue (body list +0xa78: circular list, sentinel next/prev +0xa78/+0xa80, count +0xa88) that
 // skater_body_append_transformed_angular_response and skater_body_append_projected_world_torque fill: 0x40-byte nodes.

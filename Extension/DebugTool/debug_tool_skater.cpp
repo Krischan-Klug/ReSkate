@@ -338,6 +338,13 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
         const auto past = segments_bytes(ctx ? pointer_at(ctx + step::ctx_segments_past) : 0);
         const auto future = segments_bytes(ctx ? pointer_at(ctx + step::ctx_segments_future) : 0);
         const auto torques = torque_queue_bytes(bodies);
+        alignas(16) float center_of_mass[4]{};
+        if (pose) {
+            const auto vtable = pointer_at(pose);
+            const auto get = vtable ? pointer_at(vtable + step::pose_get_center_of_mass_slot) : 0;
+            if (get)
+                reinterpret_cast<float* (*)(std::uintptr_t, float*)>(get)(pose, center_of_mass);
+        }
         const Section tick[]{
             {tag("CTX_"), ctx, step::ctx_size},
             {tag("STAT"), state, state_bytes},
@@ -356,6 +363,7 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
             {tag("SEGP"), std::uintptr_t(past.data()), std::uint32_t(past.size())},
             {tag("SEGF"), std::uintptr_t(future.data()), std::uint32_t(future.size())},
             {tag("TORQ"), std::uintptr_t(torques.data()), std::uint32_t(torques.size())},
+            {tag("COM_"), pose ? std::uintptr_t(center_of_mass) : 0, pose ? std::uint32_t(sizeof center_of_mass) : 0},
             // The prediction is large; only before the tick and only in the take-off and air states.
             {tag("TRJP"), kind == 1 && (id == 103 || id == 200 || id == 201) ? pointer_at(core + step::core_prediction_offset) : 0,
                 step::prediction_size},
