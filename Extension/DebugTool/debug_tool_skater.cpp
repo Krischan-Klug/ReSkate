@@ -378,6 +378,18 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
             {tag("C2DS"), std::uintptr_t(slide.data()), std::uint32_t(slide.size())},
         };
         write_record(3, core, -1, once, std::size(once));
+        // The default source records, one section per bundle slot (DF00..DF80); slot 0x68 is the large evaluation record.
+        {
+            const auto defaults = image_base + step::default_sources_bundle;
+            Section records[17]{};
+            static const char names[17][5] = {"DF00", "DF08", "DF10", "DF18", "DF20", "DF28", "DF30", "DF38", "DF40",
+                                            "DF48", "DF50", "DF58", "DF60", "DF68", "DF70", "DF78", "DF80"};
+            for (int slot = 0; slot < 17; ++slot) {
+                const auto record = pointer_at(defaults + slot * 8);
+                records[slot] = {tag(names[slot]), record, record ? (slot == 13 ? 0x4100u : 0x1000u) : 0u};
+            }
+            write_record(3, core, -1, records, std::size(records));
+        }
         write_record(3, core, -1, curves, std::size(curves));
     }
     if (kind == 1 || kind == 6) {

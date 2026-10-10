@@ -85,6 +85,8 @@ inline constexpr std::uint32_t math_constants_bytes = 0x5b0;
 // 0x1477a2b04/0x1477a2b48 of the balance prepare.
 inline constexpr std::uintptr_t runtime_globals = 0x77a1000;
 inline constexpr std::uint32_t runtime_globals_bytes = 0x2000;
+// The default SkaterStepSourceBundle (0x88 B of record pointers) no_bail_bail_publish copies into the live sources first.
+inline constexpr std::uintptr_t default_sources_bundle = 0x77954c0;
 // 2D curves (curve_evaluate_float_surface): asset+0x20 records of 0x10 B (tagged FloatCurve* +0, outer key +8), count
 // at records-4; a FloatCurve keeps its points at +0x18, count at points-4. Jump: tuning block +0x7e0; slide: the
 // asset's PhysicsSlide block (+0x2ad8) +0x320.
