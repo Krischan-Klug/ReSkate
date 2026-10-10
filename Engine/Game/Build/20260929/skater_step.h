@@ -71,7 +71,8 @@ inline constexpr std::uint32_t torque_node_bytes = 0x40, torque_nodes_max = 64;
 // Bound instances the ground responses read (re/controller/states/physics_ground.md): defaults ctx+0x1440 (+0x1e4..+0x1f4),
 // runtime tuning ctx+0x1448 (+0x14/+0x1c/+0x20), 412f194a ctx+0x1468, 47bd7711 ctx+0x1498. Sizes not known; 0x400 each.
 inline constexpr std::uintptr_t ctx_defaults_offset = 0x1440, ctx_runtime_tuning_offset = 0x1448,
-    ctx_instance_1468_offset = 0x1468, ctx_instance_1498_offset = 0x1498;
+    ctx_instance_1468_offset = 0x1468, ctx_instance_1498_offset = 0x1498,
+    ctx_instance_1478_offset = 0x1478;
 inline constexpr std::uint32_t bound_instance_bytes = 0x400;
 // PHYSICS_GROUND's pumping helper (state+0x58): +0x40 pumping scalar, +0x48 front-foot absorption input.
 inline constexpr std::uintptr_t ground_pumping_offset = 0x58;
