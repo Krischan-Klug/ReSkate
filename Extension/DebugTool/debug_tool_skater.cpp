@@ -224,6 +224,34 @@ std::string recording_status() {
         recording.steps.load(), double(recording.bytes.load()) / (1 << 20));
 }
 
+// A 2D curve flattened for the recording: u32 count, then per inner curve f32 outer key, u32 points, points (0x1c B each).
+std::vector<unsigned char> curve2d_bytes(std::uintptr_t asset) {
+    std::vector<unsigned char> out;
+    std::uint32_t count = 0;
+    const auto records = asset ? pointer_at((asset & ~std::uintptr_t(4)) + step::curve2d_records) : 0;
+    if (records && memory::peek(records - 4, count)) count &= 0x7fffffff;
+    if (count > 64) count = 0;
+    put(out, count);
+    for (std::uint32_t i = 0; i < count; ++i) {
+        float key = 0;
+        memory::peek(records + i * 0x10 + 8, key);
+        const auto curve = pointer_at(records + i * 0x10) & ~std::uintptr_t(4);
+        const auto points = curve ? pointer_at(curve + step::float_curve_points) : 0;
+        std::uint32_t n = 0;
+        if (points && memory::peek(points - 4, n)) n &= 0x7fffffff;
+        if (n > 256) n = 0;
+        put(out, key);
+        const auto at = out.size();
+        put(out, n);
+        out.resize(at + 4 + n * 0x1c);
+        if (n && !memory::peek_bytes(points, out.data() + at + 4, n * 0x1c)) {
+            out.resize(at + 4);
+            std::memset(out.data() + at, 0, 4);
+        }
+    }
+    return out;
+}
+
 void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, int id, std::uintptr_t ctx) {
     auto& r = recording;
     if (r.frequency && (double(now() - r.started) / double(r.frequency) > recording_seconds || r.bytes > recording_bytes)) {
@@ -243,7 +271,16 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
             {tag("TUNB"), pointer_at(core + tuning::core_tuning_block), 0xc98},
             {tag("MATH"), image_base + step::math_constants, step::math_constants_bytes},
         };
+        const auto block = pointer_at(core + tuning::core_tuning_block);
+        const auto jump = curve2d_bytes(block ? pointer_at(block + step::block_jump_curve2d) : 0);
+        const auto asset = pointer_at(image_base + tuning::asset_global);
+        const auto slide = curve2d_bytes(asset ? pointer_at(asset + step::asset_slide_curve2d) : 0);
+        const Section curves[]{
+            {tag("C2DJ"), std::uintptr_t(jump.data()), std::uint32_t(jump.size())},
+            {tag("C2DS"), std::uintptr_t(slide.data()), std::uint32_t(slide.size())},
+        };
         write_record(3, core, -1, once, std::size(once));
+        write_record(3, core, -1, curves, std::size(curves));
     }
     if (kind == 1 || kind == 6) {
         // Around the state tick (1 before, 6 after): what the tick reads and writes, to test a state on its own.

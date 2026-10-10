@@ -68,5 +68,10 @@ inline constexpr std::uintptr_t ground_pumping_offset = 0x58;
 // them at start (.udata), so the recording takes them from memory once.
 inline constexpr std::uintptr_t math_constants = 0x759fd50;
 inline constexpr std::uint32_t math_constants_bytes = 0x5b0;
+// 2D curves (curve_evaluate_float_surface): asset+0x20 records of 0x10 B (tagged FloatCurve* +0, outer key +8), count
+// at records-4; a FloatCurve keeps its points at +0x18, count at points-4. Jump: tuning block +0x7e0; slide: the
+// asset's PhysicsSlide block (+0x2ad8) +0x320.
+inline constexpr std::uintptr_t block_jump_curve2d = 0x7e0, asset_slide_curve2d = 0x2ad8 + 0x320;
+inline constexpr std::uintptr_t curve2d_records = 0x20, float_curve_points = 0x18;
 inline constexpr std::uint32_t pumping_bytes = 0x200;
 } // namespace dingosdk::game::build::v20260929::skater_step
