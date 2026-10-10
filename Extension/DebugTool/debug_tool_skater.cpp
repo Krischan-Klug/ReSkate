@@ -149,6 +149,31 @@ struct Section {
     std::uintptr_t address;
     std::uint32_t size;
 };
+// PAD_: the first connected XInput pad as the OS reports it (index, packet number, XINPUT_GAMEPAD: buttons, LT, RT,
+// LX, LY, RX, RY), so pad axes and buttons can be matched against the ctx inputs. Loaded at first use.
+struct PadSample {
+    std::uint32_t index = 0, packet = 0;
+    std::uint16_t buttons = 0;
+    std::uint8_t left_trigger = 0, right_trigger = 0;
+    std::int16_t left_x = 0, left_y = 0, right_x = 0, right_y = 0;
+};
+bool read_pad(PadSample& sample) {
+    struct State { DWORD packet; std::uint16_t buttons; std::uint8_t lt, rt; std::int16_t lx, ly, rx, ry; };
+    using Get = DWORD(WINAPI*)(DWORD, State*);
+    static const Get get = [] {
+        HMODULE module = LoadLibraryW(L"xinput1_4.dll");
+        if (!module) module = LoadLibraryW(L"xinput9_1_0.dll");
+        return module ? reinterpret_cast<Get>(GetProcAddress(module, "XInputGetState")) : nullptr;
+    }();
+    if (!get) return false;
+    for (DWORD i = 0; i < 4; ++i) {
+        State state{};
+        if (get(i, &state) != ERROR_SUCCESS) continue;
+        sample = {i, state.packet, state.buttons, state.lt, state.rt, state.lx, state.ly, state.rx, state.ry};
+        return true;
+    }
+    return false;
+}
 template<class T> void put(std::vector<unsigned char>& out, const T& value) {
     const auto at = out.size();
     out.resize(at + sizeof value);
@@ -364,6 +389,8 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
         const auto past = segments_bytes(ctx ? pointer_at(ctx + step::ctx_segments_past) : 0);
         const auto future = segments_bytes(ctx ? pointer_at(ctx + step::ctx_segments_future) : 0);
         const auto torques = torque_queue_bytes(bodies);
+        PadSample pad;
+        const bool has_pad = kind == 1 && read_pad(pad);
         alignas(16) float center_of_mass[4]{};
         if (pose) {
             const auto vtable = pointer_at(pose);
@@ -392,6 +419,7 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
             {tag("TORQ"), std::uintptr_t(torques.data()), std::uint32_t(torques.size())},
             {tag("WRC_"), provider ? provider + step::provider_wallride_cache : 0, provider ? step::wallride_cache_bytes : 0},
             {tag("COM_"), pose ? std::uintptr_t(center_of_mass) : 0, pose ? std::uint32_t(sizeof center_of_mass) : 0},
+            {tag("PAD_"), has_pad ? std::uintptr_t(&pad) : 0, has_pad ? std::uint32_t(sizeof pad) : 0},
             // The prediction is large; only before the tick and only in the take-off and air states.
             {tag("TRJP"), kind == 1 && (id == 103 || id == 200 || id == 201) ? pointer_at(core + step::core_prediction_offset) : 0,
                 step::prediction_size},
