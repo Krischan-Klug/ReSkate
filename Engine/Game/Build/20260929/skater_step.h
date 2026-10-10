@@ -25,7 +25,7 @@ inline constexpr Fingerprint advance_state_contract{0x47da1b0, {
 // bound tuning instances in the ctx: G +0x1480, S +0x1490, K +0x14a0. Sizes cover the fields it reads.
 inline constexpr std::uintptr_t core_chooser_offset = 0x440;
 inline constexpr std::uint32_t chooser_bytes = 0x60, bundle_bytes = 0x60, bundle_state_bytes = 0x200,
-    bundle_10_bytes = 0x200, bundle_30_bytes = 0x1000, bundle_38_bytes = 0x100, chooser_owner_bytes = 0xb00;
+    bundle_10_bytes = 0x200, bundle_30_bytes = 0x1000, bundle_38_bytes = 0x100, chooser_owner_bytes = 0x2700; // natural air reads +0xa5c and +0x26bc
 inline constexpr std::uintptr_t ctx_instance_g_offset = 0x1480, ctx_instance_s_offset = 0x1490,
     ctx_instance_k_offset = 0x14a0;
 inline constexpr std::uint32_t instance_g_bytes = 0x50, instance_s_bytes = 0x110, instance_k_bytes = 0x28;
