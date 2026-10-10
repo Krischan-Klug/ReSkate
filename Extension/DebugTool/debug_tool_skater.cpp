@@ -584,6 +584,8 @@ void record_choice(std::uint32_t kind, std::uintptr_t core) {
         {tag("SB28"), bundle ? pointer_at(bundle + 0x28) : 0, source_bytes},
         {tag("SB40"), bundle ? pointer_at(bundle + 0x40) : 0, 0x2a0},
         {tag("SB48"), bundle ? pointer_at(bundle + 0x48) : 0, 0xb0},
+        {tag("SB58"), bundle ? pointer_at(bundle + 0x58) : 0, 0x50},
+        {tag("SB60"), bundle ? pointer_at(bundle + 0x60) : 0, 0xc0},
         {tag("SB70"), bundle ? pointer_at(bundle + 0x70) : 0, 0x50},
         {tag("SB78"), bundle ? pointer_at(bundle + 0x78) : 0, 0x1a0},
         {tag("SNAP"), pointer_at(core + 0x3c8), snapshot_bytes},
