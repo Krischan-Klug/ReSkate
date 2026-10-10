@@ -456,7 +456,7 @@ void observe(std::uint32_t kind, std::uintptr_t core) {
 }
 
 // skater.step, around the state choice (kind 4 before, kind 5 after): everything the chooser reads
-// (re/controller/state-selection.md), so the C# rebuild can make the same choice from the same inputs.
+// (re/controller/selection/state-selection.md), so the C# rebuild can make the same choice from the same inputs.
 void record_choice(std::uint32_t kind, std::uintptr_t core) {
     const auto state = pointer_at(core + step::core_state_offset);
     const auto chooser = pointer_at(core + step::core_chooser_offset);
