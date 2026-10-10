@@ -436,6 +436,11 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
         write_record(kind, core, id, tick, std::size(tick));
         return;
     }
+    // After the step the source publishers run (no_bail_bail_publish): POSE, BODY and the board provider PROV are what
+    // the board publisher reads, so its output can be checked against the next kind 4.
+    const auto pose = state ? pointer_at(state + step::state_pose_offset) : 0;
+    const auto provider = pose ? pointer_at(pose + step::pose_provider_offset) : 0;
+    const auto bodies = provider ? pointer_at(provider + step::provider_body_list_offset) : 0;
     const Section after[]{
         {tag("CORE"), core, step::core_size},
         {tag("CTX_"), ctx, step::ctx_size},
@@ -444,6 +449,9 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
         {tag("SURF"), pointer_at(core + step::core_surface_offset), step::surface_size},
         {tag("TRAJ"), pointer_at(core + step::core_trajectory_offset), step::trajectory_size},
         {tag("CTRL"), pointer_at(core + step::core_controller_offset), step::controller_size},
+        {tag("POSE"), pose, pose ? step::pose_bytes : 0},
+        {tag("BODY"), bodies, bodies ? step::body_list_bytes : 0},
+        {tag("PROV"), provider, provider ? step::provider_wallride_cache : 0},
     };
     write_record(kind, core, id, after, std::size(after));
 }
