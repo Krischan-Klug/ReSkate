@@ -77,5 +77,8 @@ inline constexpr std::uintptr_t curve2d_records = 0x20, float_curve_points = 0x1
 // pointers with the count at array-4; a segment keeps normal +0x20, direction +0x30, start +0x40, end +0x50, angle +0x64.
 inline constexpr std::uintptr_t ctx_segments_past = 0x11f0, ctx_segments_future = 0x11f8;
 inline constexpr std::uint32_t segment_bytes = 0x70, segments_max = 128;
+// The core's trajectory prediction (core+0x3e8, 0xbba0 B): KNOWN_AIR and the take-off read its samples and query.
+inline constexpr std::uintptr_t core_prediction_offset = 0x3e8;
+inline constexpr std::uint32_t prediction_size = 0xbba0;
 inline constexpr std::uint32_t pumping_bytes = 0x200;
 } // namespace dingosdk::game::build::v20260929::skater_step

@@ -334,6 +334,9 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
             {tag("PUMP"), id == 100 && state ? pointer_at(state + step::ground_pumping_offset) : 0, step::pumping_bytes},
             {tag("SEGP"), std::uintptr_t(past.data()), std::uint32_t(past.size())},
             {tag("SEGF"), std::uintptr_t(future.data()), std::uint32_t(future.size())},
+            // The prediction is large; only before the tick and only in the take-off and air states.
+            {tag("TRJP"), kind == 1 && (id == 103 || id == 200 || id == 201) ? pointer_at(core + step::core_prediction_offset) : 0,
+                step::prediction_size},
         };
         write_record(kind, core, id, tick, std::size(tick));
         return;
