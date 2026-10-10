@@ -241,6 +241,7 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
         const Section once[]{
             {tag("TUNA"), pointer_at(image_base + tuning::asset_global), tuning::asset_size},
             {tag("TUNB"), pointer_at(core + tuning::core_tuning_block), 0xc98},
+            {tag("MATH"), image_base + step::math_constants, step::math_constants_bytes},
         };
         write_record(3, core, -1, once, std::size(once));
     }

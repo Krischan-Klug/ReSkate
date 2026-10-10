@@ -64,5 +64,9 @@ inline constexpr std::uintptr_t ctx_defaults_offset = 0x1440, ctx_runtime_tuning
 inline constexpr std::uint32_t bound_instance_bytes = 0x400;
 // PHYSICS_GROUND's pumping helper (state+0x58): +0x40 pumping scalar, +0x48 front-foot absorption input.
 inline constexpr std::uintptr_t ground_pumping_offset = 0x58;
+// Vector-math constants the controller reads (sin polynomial, 2pi, 1/2pi, pi at +0x759fd50..+0x75a0300); the exe fills
+// them at start (.udata), so the recording takes them from memory once.
+inline constexpr std::uintptr_t math_constants = 0x759fd50;
+inline constexpr std::uint32_t math_constants_bytes = 0x5b0;
 inline constexpr std::uint32_t pumping_bytes = 0x200;
 } // namespace dingosdk::game::build::v20260929::skater_step
