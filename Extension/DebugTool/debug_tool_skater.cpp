@@ -106,6 +106,8 @@ struct Recording {
 // No time limit: the recording runs until switched off; past this size it continues in the next part file.
 constexpr std::uint64_t recording_part_bytes = 400ull << 20;
 constexpr std::uint32_t state_bytes = 0x1000; // the largest state object fits; past its end is other heap
+// Source records without a known size (B00/B08/B18/B28) and the pose snapshot: generous, past the last known field.
+constexpr std::uint32_t source_bytes = 0x400, snapshot_bytes = 0x500;
 
 void switch_state(bool on);
 void switch_recording(bool on);
@@ -553,6 +555,18 @@ void record_choice(std::uint32_t kind, std::uintptr_t core) {
         {tag("INSG"), ctx ? pointer_at(ctx + step::ctx_instance_g_offset) : 0, step::instance_g_bytes},
         {tag("INSS"), ctx ? pointer_at(ctx + step::ctx_instance_s_offset) : 0, step::instance_s_bytes},
         {tag("INSK"), ctx ? pointer_at(ctx + step::ctx_instance_k_offset) : 0, step::instance_k_bytes},
+        // The other source records and the pose snapshot core_fill_step_state reads (SkaterStepSourceBundle, core+0x3c8),
+        // and the core, so the fill can be checked from its inputs.
+        {tag("SB00"), bundle ? pointer_at(bundle + 0x00) : 0, source_bytes},
+        {tag("SB08"), bundle ? pointer_at(bundle + 0x08) : 0, source_bytes},
+        {tag("SB18"), bundle ? pointer_at(bundle + 0x18) : 0, source_bytes},
+        {tag("SB28"), bundle ? pointer_at(bundle + 0x28) : 0, source_bytes},
+        {tag("SB40"), bundle ? pointer_at(bundle + 0x40) : 0, 0x2a0},
+        {tag("SB48"), bundle ? pointer_at(bundle + 0x48) : 0, 0xb0},
+        {tag("SB70"), bundle ? pointer_at(bundle + 0x70) : 0, 0x50},
+        {tag("SB78"), bundle ? pointer_at(bundle + 0x78) : 0, 0x1a0},
+        {tag("SNAP"), pointer_at(core + 0x3c8), snapshot_bytes},
+        {tag("CORE"), core, 0x1000}, // the fill reads core fields below +0x1000 (timers +0x1a0..+0x1b4, +0x5e0, +0xe48)
     };
     write_record(kind, core, state_id(state), before, std::size(before));
 }
