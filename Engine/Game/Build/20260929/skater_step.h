@@ -57,6 +57,10 @@ inline constexpr std::uint32_t pose_bytes = 0x400, pose_record_size = 0x30, pose
 // dirty flags +0x60, linear velocity +0x70, angular +0x90 (skater_pose_write_primary_body_velocity).
 inline constexpr std::uintptr_t pose_provider_offset = 0x18, provider_body_list_offset = 0x20;
 inline constexpr std::uint32_t body_list_bytes = 26 * 0x130;
+// The board proxy's torque queue (body list +0xa78: circular list, sentinel next/prev +0xa78/+0xa80, count +0xa88) that
+// skater_body_append_transformed_angular_response and skater_body_append_projected_world_torque fill: 0x40-byte nodes.
+inline constexpr std::uintptr_t body_torque_queue = 0xa78;
+inline constexpr std::uint32_t torque_node_bytes = 0x40, torque_nodes_max = 64;
 // Bound instances the ground responses read (re/controller/states/physics_ground.md): defaults ctx+0x1440 (+0x1e4..+0x1f4),
 // runtime tuning ctx+0x1448 (+0x14/+0x1c/+0x20), 412f194a ctx+0x1468, 47bd7711 ctx+0x1498. Sizes not known; 0x400 each.
 inline constexpr std::uintptr_t ctx_defaults_offset = 0x1440, ctx_runtime_tuning_offset = 0x1448,

@@ -269,6 +269,26 @@ std::vector<unsigned char> segments_bytes(std::uintptr_t array) {
     return out;
 }
 
+// The torque queue flattened for the recording: u32 count, then the 0x40-byte nodes in queue order.
+std::vector<unsigned char> torque_queue_bytes(std::uintptr_t bodies) {
+    std::vector<unsigned char> out;
+    put(out, std::uint32_t(0));
+    if (!bodies) return out;
+    const auto sentinel = bodies + step::body_torque_queue;
+    std::uint32_t count = 0;
+    for (auto node = pointer_at(sentinel); node && node != sentinel && count < step::torque_nodes_max; node = pointer_at(node)) {
+        const auto at = out.size();
+        out.resize(at + step::torque_node_bytes);
+        if (!memory::peek_bytes(node, out.data() + at, step::torque_node_bytes)) {
+            out.resize(at);
+            break;
+        }
+        ++count;
+    }
+    std::memcpy(out.data(), &count, 4);
+    return out;
+}
+
 void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, int id, std::uintptr_t ctx) {
     auto& r = recording;
     if (r.frequency && (double(now() - r.started) / double(r.frequency) > recording_seconds || r.bytes > recording_bytes)) {
@@ -317,6 +337,7 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
         }
         const auto past = segments_bytes(ctx ? pointer_at(ctx + step::ctx_segments_past) : 0);
         const auto future = segments_bytes(ctx ? pointer_at(ctx + step::ctx_segments_future) : 0);
+        const auto torques = torque_queue_bytes(bodies);
         const Section tick[]{
             {tag("CTX_"), ctx, step::ctx_size},
             {tag("STAT"), state, state_bytes},
@@ -334,6 +355,7 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
             {tag("PUMP"), id == 100 && state ? pointer_at(state + step::ground_pumping_offset) : 0, step::pumping_bytes},
             {tag("SEGP"), std::uintptr_t(past.data()), std::uint32_t(past.size())},
             {tag("SEGF"), std::uintptr_t(future.data()), std::uint32_t(future.size())},
+            {tag("TORQ"), std::uintptr_t(torques.data()), std::uint32_t(torques.size())},
             // The prediction is large; only before the tick and only in the take-off and air states.
             {tag("TRJP"), kind == 1 && (id == 103 || id == 200 || id == 201) ? pointer_at(core + step::core_prediction_offset) : 0,
                 step::prediction_size},
