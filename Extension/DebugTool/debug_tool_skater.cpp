@@ -181,8 +181,8 @@ template<class T> void put(std::vector<unsigned char>& out, const T& value) {
 }
 // Record: 'RECD', kind (1 before the state tick, 2 after the step, 3 tuning), QPC time, core, state id, section
 // count; per section its tag, size (0 = unreadable) and bytes.
-void write_record(std::uint32_t kind, std::uintptr_t core, int state, const Section* sections, std::size_t count) {
-    thread_local std::vector<unsigned char> out;
+void build_record(std::vector<unsigned char>& out, std::uint32_t kind, std::uintptr_t core, int state, const Section* sections,
+                  std::size_t count) {
     out.clear();
     put(out, tag("RECD"));
     put(out, kind);
@@ -200,11 +200,18 @@ void write_record(std::uint32_t kind, std::uintptr_t core, int state, const Sect
             std::memset(out.data() + at + 4, 0, 4);
         }
     }
+}
+void emit_record(const std::vector<unsigned char>& out, std::uint32_t kind) {
     std::lock_guard guard(recording.lock);
     if (!recording.file) return;
     std::fwrite(out.data(), 1, out.size(), recording.file);
     recording.bytes += out.size();
     if (kind == 2) ++recording.steps;
+}
+void write_record(std::uint32_t kind, std::uintptr_t core, int state, const Section* sections, std::size_t count) {
+    thread_local std::vector<unsigned char> out;
+    build_record(out, kind, core, state, sections, count);
+    emit_record(out, kind);
 }
 
 // Opens the current part (caller holds the lock). Part 1 is step-<time>.rsrec, later parts step-<time>-pN.rsrec;
@@ -485,14 +492,51 @@ void observe(std::uint32_t kind, std::uintptr_t core) {
 
 // skater.step, around the state choice (kind 4 before, kind 5 after): everything the chooser reads
 // (re/controller/selection/state-selection.md), so the C# rebuild can make the same choice from the same inputs.
+// Around a state switch (Exit, then Enter): kind 7 holds the blocks right before the choice, kind 8 right after the
+// switch, both only written when the state object changed. STAT is the old state in 7 and the new state in 8; 8 also
+// has the old state as OLDS (its Exit writes).
+struct SwitchSnapshot {
+    std::vector<unsigned char> before;
+    std::uintptr_t state = 0;
+};
+thread_local SwitchSnapshot switch_snapshot;
+
+void switch_sections(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, std::uintptr_t old_state,
+                     std::vector<unsigned char>& out) {
+    const auto ctx = pointer_at(core + step::core_ctx_offset);
+    const auto pose = state ? pointer_at(state + step::state_pose_offset) : 0;
+    const auto provider = pose ? pointer_at(pose + step::pose_provider_offset) : 0;
+    const auto bodies = provider ? pointer_at(provider + step::provider_body_list_offset) : 0;
+    const Section sections[]{
+        {tag("CTX_"), ctx, step::ctx_size},
+        {tag("STAT"), state, state_bytes},
+        {tag("OLDS"), old_state, old_state ? state_bytes : 0},
+        {tag("RIG_"), pointer_at(core + step::core_rig_offset), step::rig_size},
+        {tag("CTRL"), pointer_at(core + step::core_controller_offset), step::controller_size},
+        {tag("POSE"), pose, pose ? step::pose_bytes : 0},
+        {tag("BODY"), bodies, bodies ? step::body_list_bytes : 0},
+        {tag("CORE"), core, step::core_size},
+    };
+    build_record(out, kind, core, state_id(state), sections, std::size(sections));
+}
+
 void record_choice(std::uint32_t kind, std::uintptr_t core) {
     const auto state = pointer_at(core + step::core_state_offset);
     const auto chooser = pointer_at(core + step::core_chooser_offset);
     if (kind == 5) {
         const Section after[]{{tag("CHSR"), chooser, step::chooser_bytes}};
         write_record(kind, core, state_id(state), after, std::size(after));
+        if (state != switch_snapshot.state && !switch_snapshot.before.empty()) {
+            emit_record(switch_snapshot.before, 7);
+            thread_local std::vector<unsigned char> after_switch;
+            switch_sections(8, core, state, switch_snapshot.state, after_switch);
+            emit_record(after_switch, 8);
+        }
+        switch_snapshot.before.clear();
         return;
     }
+    switch_snapshot.state = state;
+    switch_sections(7, core, state, 0, switch_snapshot.before);
     const auto ctx = pointer_at(core + step::core_ctx_offset);
     const auto bundle = chooser ? pointer_at(chooser) : 0;
     const auto chooser_10 = chooser ? pointer_at(chooser + 0x10) : 0;
