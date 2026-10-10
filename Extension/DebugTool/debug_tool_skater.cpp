@@ -252,6 +252,23 @@ std::vector<unsigned char> curve2d_bytes(std::uintptr_t asset) {
     return out;
 }
 
+// A segment list flattened for the recording: u32 count, then count segments of segment_bytes each.
+std::vector<unsigned char> segments_bytes(std::uintptr_t array) {
+    std::vector<unsigned char> out;
+    std::uint32_t count = 0;
+    if (array && memory::peek(array - 4, count)) count &= 0x7fffffff;
+    if (count > step::segments_max) count = 0;
+    put(out, count);
+    for (std::uint32_t i = 0; i < count; ++i) {
+        const auto segment = pointer_at(array + i * 8) & ~std::uintptr_t(4);
+        const auto at = out.size();
+        out.resize(at + step::segment_bytes);
+        if (!segment || !memory::peek_bytes(segment, out.data() + at, step::segment_bytes))
+            std::memset(out.data() + at, 0, step::segment_bytes);
+    }
+    return out;
+}
+
 void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, int id, std::uintptr_t ctx) {
     auto& r = recording;
     if (r.frequency && (double(now() - r.started) / double(r.frequency) > recording_seconds || r.bytes > recording_bytes)) {
@@ -298,6 +315,8 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
                 record_bytes = std::uint32_t(std::min<std::uintptr_t>(end - records,
                     std::uintptr_t(step::pose_record_size) * step::pose_records_max));
         }
+        const auto past = segments_bytes(ctx ? pointer_at(ctx + step::ctx_segments_past) : 0);
+        const auto future = segments_bytes(ctx ? pointer_at(ctx + step::ctx_segments_future) : 0);
         const Section tick[]{
             {tag("CTX_"), ctx, step::ctx_size},
             {tag("STAT"), state, state_bytes},
@@ -313,6 +332,8 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
             {tag("I468"), ctx ? pointer_at(ctx + step::ctx_instance_1468_offset) : 0, step::bound_instance_bytes},
             {tag("I498"), ctx ? pointer_at(ctx + step::ctx_instance_1498_offset) : 0, step::bound_instance_bytes},
             {tag("PUMP"), id == 100 && state ? pointer_at(state + step::ground_pumping_offset) : 0, step::pumping_bytes},
+            {tag("SEGP"), std::uintptr_t(past.data()), std::uint32_t(past.size())},
+            {tag("SEGF"), std::uintptr_t(future.data()), std::uint32_t(future.size())},
         };
         write_record(kind, core, id, tick, std::size(tick));
         return;
