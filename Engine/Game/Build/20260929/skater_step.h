@@ -62,4 +62,7 @@ inline constexpr std::uint32_t body_list_bytes = 26 * 0x130;
 inline constexpr std::uintptr_t ctx_defaults_offset = 0x1440, ctx_runtime_tuning_offset = 0x1448,
     ctx_instance_1468_offset = 0x1468, ctx_instance_1498_offset = 0x1498;
 inline constexpr std::uint32_t bound_instance_bytes = 0x400;
+// PHYSICS_GROUND's pumping helper (state+0x58): +0x40 pumping scalar, +0x48 front-foot absorption input.
+inline constexpr std::uintptr_t ground_pumping_offset = 0x58;
+inline constexpr std::uint32_t pumping_bytes = 0x200;
 } // namespace dingosdk::game::build::v20260929::skater_step

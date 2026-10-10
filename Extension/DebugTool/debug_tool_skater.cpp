@@ -274,6 +274,7 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
             {tag("I448"), ctx ? pointer_at(ctx + step::ctx_runtime_tuning_offset) : 0, step::bound_instance_bytes},
             {tag("I468"), ctx ? pointer_at(ctx + step::ctx_instance_1468_offset) : 0, step::bound_instance_bytes},
             {tag("I498"), ctx ? pointer_at(ctx + step::ctx_instance_1498_offset) : 0, step::bound_instance_bytes},
+            {tag("PUMP"), id == 100 && state ? pointer_at(state + step::ground_pumping_offset) : 0, step::pumping_bytes},
         };
         write_record(kind, core, id, tick, std::size(tick));
         return;
