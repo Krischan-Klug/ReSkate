@@ -59,6 +59,10 @@ inline constexpr std::uintptr_t pose_provider_offset = 0x18, provider_body_list_
 // The pose's virtual +0x10 returns the board body's local centre of mass (the point of the friction record, channel 6);
 // +0x20 sets it (the slide pivot). Signature: Vec4* (pose*, Vec4* out).
 inline constexpr std::uintptr_t pose_get_center_of_mass_slot = 0x10;
+// The provider's wall-ride probe cache (provider = pose+0x18, cache at +0x2800, 0x40 B) that
+// skater_build_wallride_responses reads (channel 16).
+inline constexpr std::uintptr_t provider_wallride_cache = 0x2800;
+inline constexpr std::uint32_t wallride_cache_bytes = 0x40;
 inline constexpr std::uint32_t body_list_bytes = 26 * 0x130;
 // The board proxy's torque queue (body list +0xa78: circular list, sentinel next/prev +0xa78/+0xa80, count +0xa88) that
 // skater_body_append_transformed_angular_response and skater_body_append_projected_world_torque fill: 0x40-byte nodes.

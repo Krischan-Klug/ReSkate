@@ -363,6 +363,7 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
             {tag("SEGP"), std::uintptr_t(past.data()), std::uint32_t(past.size())},
             {tag("SEGF"), std::uintptr_t(future.data()), std::uint32_t(future.size())},
             {tag("TORQ"), std::uintptr_t(torques.data()), std::uint32_t(torques.size())},
+            {tag("WRC_"), provider ? provider + step::provider_wallride_cache : 0, provider ? step::wallride_cache_bytes : 0},
             {tag("COM_"), pose ? std::uintptr_t(center_of_mass) : 0, pose ? std::uint32_t(sizeof center_of_mass) : 0},
             // The prediction is large; only before the tick and only in the take-off and air states.
             {tag("TRJP"), kind == 1 && (id == 103 || id == 200 || id == 201) ? pointer_at(core + step::core_prediction_offset) : 0,
