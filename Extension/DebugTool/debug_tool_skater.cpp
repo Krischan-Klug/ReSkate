@@ -6,6 +6,7 @@
 #include "Engine/Game/Build/20260929/skater_step.h"
 #include "Extension/Skater/no_bail.h"
 #include <Windows.h>
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdio>
@@ -245,6 +246,17 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
     }
     if (kind == 1 || kind == 6) {
         // Around the state tick (1 before, 6 after): what the tick reads and writes, to test a state on its own.
+        // POSE is the state's pose helper, PREC its response records (what the tick publishes).
+        const auto pose = state ? pointer_at(state + step::state_pose_offset) : 0;
+        std::uintptr_t records = 0;
+        std::uint32_t record_bytes = 0;
+        if (pose) {
+            records = pointer_at(pose + step::pose_records_offset);
+            const auto end = pointer_at(pose + step::pose_records_offset + 8);
+            if (records && end > records)
+                record_bytes = std::uint32_t(std::min<std::uintptr_t>(end - records,
+                    std::uintptr_t(step::pose_record_size) * step::pose_records_max));
+        }
         const Section tick[]{
             {tag("CTX_"), ctx, step::ctx_size},
             {tag("STAT"), state, state_bytes},
@@ -252,6 +264,8 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
             {tag("CTRL"), pointer_at(core + step::core_controller_offset), step::controller_size},
             {tag("SURF"), pointer_at(core + step::core_surface_offset), step::surface_size},
             {tag("TRAJ"), pointer_at(core + step::core_trajectory_offset), step::trajectory_size},
+            {tag("POSE"), pose, pose ? step::pose_bytes : 0},
+            {tag("PREC"), records, record_bytes},
         };
         write_record(kind, core, id, tick, std::size(tick));
         return;

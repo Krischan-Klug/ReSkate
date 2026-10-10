@@ -49,4 +49,8 @@ inline constexpr std::uintptr_t core_trajectory_offset = 0x3f8;
 inline constexpr std::uint32_t trajectory_size = 0x2a0;
 inline constexpr std::uintptr_t core_rig_offset = 0x438;
 inline constexpr std::uint32_t rig_size = 0x5ac0;
+// The state's pose helper (state+0x10): truck twist +0x140, ctx +0x178, response records [+0x190, +0x198) of 0x30 B
+// (skater_pose_update_truck_twist, skater_pose_sum_record_vectors). Its size is not known; 0x400 covers the fields read.
+inline constexpr std::uintptr_t state_pose_offset = 0x10, pose_records_offset = 0x190;
+inline constexpr std::uint32_t pose_bytes = 0x400, pose_record_size = 0x30, pose_records_max = 64;
 } // namespace dingosdk::game::build::v20260929::skater_step
