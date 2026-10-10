@@ -29,5 +29,9 @@ struct RecordingInfo {
     int part{};
 };
 RecordingInfo recording_info() noexcept;
+// True once the step probe's hooks are in (the recording can run).
+bool recording_available() noexcept;
+// Starts or stops the recording (F9); any thread.
+void toggle_recording() noexcept;
 inline constexpr std::string_view recording_probe = "skater.step";
 }

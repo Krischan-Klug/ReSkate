@@ -59,11 +59,6 @@ void draw_probes(float k, ImFont* bold, ImFont* body) {
     (void)k;
 }
 
-bool foreground_is_game() {
-    DWORD process{};
-    GetWindowThreadProcessId(GetForegroundWindow(), &process);
-    return process == GetCurrentProcessId();
-}
 }
 
 void draw_debug_window() {
@@ -120,36 +115,71 @@ void draw_debug_window() {
     ImGui::PopStyleVar(3);
 }
 
-void draw_debug_hud() {
-    // F9 toggles the step recording while the game has focus, console open or not.
-    static bool f9_down = false;
-    const bool down = (GetAsyncKeyState(VK_F9) & 0x8000) != 0 && foreground_is_game();
-    if (down && !f9_down) {
-        const auto active = debug_tool::recording_info().active;
-        debug_tool::set_enabled(debug_tool::recording_probe, !active);
-    }
-    f9_down = down;
+bool debug_hud_pending() { return debug_tool::recording_available(); }
 
-    const auto info = debug_tool::recording_info();
-    if (!info.active) return;
+// The recording card, drawn like Hall of Meat's score card (hall_of_meat_overlay.cpp): skate.'s dark tile, white
+// numbers over a soft shadow, its blue stroke, in 1080p pixels from a screen corner — top left here, so it never meets
+// the Meat card in the bottom left. Always on screen: small while idle ("F9 = record"), the full card while recording.
+void draw_debug_hud() {
+    const auto display = ImGui::GetIO().DisplaySize;
+    if (display.x <= 0 || display.y <= 0) return;
     auto& s = detail::state();
-    const float k = scale();
-    const auto P = [k](float value) { return value * k; };
-    auto* font = s.menu.bold ? s.menu.bold : ImGui::GetFont();
-    auto* draw = ImGui::GetForegroundDrawList();
-    const auto text = std::format("REC  {}   {} steps   {:.0f} MB   part {}    F9 = stop", clock(info.seconds), info.steps,
-        info.megabytes, info.part);
-    const float size = P(18);
-    const auto extent = font->CalcTextSizeA(size, FLT_MAX, 0, text.c_str());
-    const auto* viewport = ImGui::GetMainViewport();
-    const float dot = P(8), pad = P(10);
-    const ImVec2 box(extent.x + dot * 2 + pad * 3, extent.y + pad * 2);
-    const ImVec2 at(viewport->WorkPos.x + (viewport->WorkSize.x - box.x) * 0.5f, viewport->WorkPos.y + P(10));
-    draw->AddRectFilled(at, ImVec2(at.x + box.x, at.y + box.y), IM_COL32(10, 10, 11, 220));
-    draw->AddRect(at, ImVec2(at.x + box.x, at.y + box.y), skate::danger, 0, 0, P(2));
-    // The dot blinks once a second.
+    auto* title_font = s.menu.title ? s.menu.title : ImGui::GetFont();
+    auto* heading = s.menu.heading ? s.menu.heading : ImGui::GetFont();
+    auto* bold = s.menu.bold ? s.menu.bold : ImGui::GetFont();
+    auto* draw = ImGui::GetBackgroundDrawList();
+    const float k = display.y / 1080.0f;
+    const auto shadowed = [&](ImFont* font, float size, ImVec2 at, ImU32 colour, const std::string& text) {
+        const float offset = std::max(1.0f, size / 16.0f);
+        draw->AddText(font, size, ImVec2(at.x + offset, at.y + offset), IM_COL32(0, 0, 0, 178), text.c_str());
+        draw->AddText(font, size, at, colour, text.c_str());
+    };
+    const auto width_of = [](ImFont* font, float size, const std::string& text) {
+        return font->CalcTextSizeA(size, FLT_MAX, 0.0f, text.c_str()).x;
+    };
+    constexpr float corner_left = 64.0f, corner_top = 64.0f, card_width = 250.0f;
+    const float left = corner_left * k, right = left + card_width * k, pad = 14.0f * k, top = corner_top * k;
+    const auto info = debug_tool::recording_info();
+    const ImU32 tile = IM_COL32(26, 26, 26, 235);
+
+    if (!info.active) {
+        const float size = 18.0f * k, height = size + pad * 1.4f;
+        const ImVec2 min(left, top), max(right, top + height);
+        skate::rough_rect(draw, min, max, tile, 301u, k);
+        const float middle = top + height * 0.5f;
+        draw->AddCircle(ImVec2(left + pad + 6.0f * k, middle), 6.0f * k, skate::grey_text, 0, 2.0f * k);
+        shadowed(bold, size, ImVec2(left + pad + 20.0f * k, middle - size * 0.5f), skate::grey_text, "F9  =  RECORD");
+        return;
+    }
+
+    const float title_size = 22.0f * k, time_size = 56.0f * k, line_size = 18.0f * k, foot_size = 16.0f * k;
+    const float height = pad * 2.0f + title_size + time_size + line_size * 2.0f + foot_size + 12.0f * k;
+    const ImVec2 min(left, top), max(right, top + height);
+    skate::rough_rect(draw, min, max, tile, 307u, k);
+    float y = top + pad;
+    const float centre = (left + right) * 0.5f;
+    // Title with the blinking dot.
+    const std::string title = "RECORDING";
+    const float title_width = width_of(heading, title_size, title);
+    const float dot = 7.0f * k;
+    const float title_left = centre - (title_width + dot * 2.0f + 8.0f * k) * 0.5f;
     if (static_cast<int>(info.seconds * 2) % 2 == 0)
-        draw->AddCircleFilled(ImVec2(at.x + pad + dot, at.y + box.y * 0.5f), dot, skate::danger);
-    draw->AddText(font, size, ImVec2(at.x + pad * 2 + dot * 2, at.y + pad), skate::white, text.c_str());
+        draw->AddCircleFilled(ImVec2(title_left + dot, y + title_size * 0.5f), dot, skate::danger);
+    shadowed(heading, title_size, ImVec2(title_left + dot * 2.0f + 8.0f * k, y), skate::white, title);
+    y += title_size;
+    // The time, big, on skate.'s blue stroke.
+    const auto total = static_cast<int>(info.seconds);
+    const auto time = std::format("{:02}:{:02}", total / 60, total % 60);
+    const float stroke = width_of(title_font, time_size, time) * 0.5f + 20.0f * k;
+    draw->AddRectFilled(ImVec2(centre - stroke, y + time_size * 0.62f), ImVec2(centre + stroke, y + time_size * 0.9f), skate::blue);
+    shadowed(title_font, time_size, ImVec2(centre - width_of(title_font, time_size, time) * 0.5f, y), skate::white, time);
+    y += time_size + 4.0f * k;
+    const auto row = [&](const std::string& text, ImU32 colour, float size) {
+        shadowed(bold, size, ImVec2(centre - width_of(bold, size, text) * 0.5f, y), colour, text);
+        y += size + 2.0f * k;
+    };
+    row(std::format("{} steps", info.steps), skate::white, line_size);
+    row(std::format("{:.0f} MB   part {}", info.megabytes, info.part), skate::white, line_size);
+    row("F9  =  STOP", skate::grey_text, foot_size);
 }
 }

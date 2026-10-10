@@ -1,3 +1,4 @@
+#include "Extension/DebugTool/debug_tool.h"
 #include "Engine/Core/Platform/launcher_support.h"
 #include "Engine/Core/Log/logging.h"
 #include "overlay_internal.h"
@@ -178,6 +179,12 @@ LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wp, LPARAM lp) {
                 std::lock_guard lock(s.input_mutex);
                 s.input.clear();
             } else if (release) s.chat_escape_pending.store(false);
+            return 0;
+        }
+        // F9: the debug tool's step recording on and off, with or without the console (re-tools only).
+        if (wp == VK_F9 && (message == WM_KEYDOWN || message == WM_SYSKEYDOWN || message == WM_KEYUP || message == WM_SYSKEYUP)) {
+            if ((message == WM_KEYDOWN || message == WM_SYSKEYDOWN) && (static_cast<ULONG_PTR>(lp) & (1ull << 30)) == 0)
+                dingosdk::debug_tool::toggle_recording();
             return 0;
         }
         if (console_toggle_key(message, wp, lp)) {

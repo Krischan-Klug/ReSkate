@@ -523,6 +523,10 @@ RecordingInfo recording_info() noexcept {
     return info;
 }
 
+bool recording_available() noexcept { return hooked.load(); }
+
+void toggle_recording() noexcept { (void)set_enabled(recording_probe, !step_probe.enabled.load()); }
+
 bool start_skater_probes(std::uintptr_t base) noexcept {
     if (hooked.load()) return true;
     image_base = base;
