@@ -80,6 +80,11 @@ inline constexpr std::uintptr_t ground_pumping_offset = 0x58;
 // them at start (.udata), so the recording takes them from memory once.
 inline constexpr std::uintptr_t math_constants = 0x759fd50;
 inline constexpr std::uint32_t math_constants_bytes = 0x5b0;
+// Runtime-initialised controller globals (zero in the file): curves, thresholds and gains the skater code reads,
+// e.g. 0x1477a1ac4 arrival steps, 0x1477a21f8/0x1477a2200 collision torque decay/timer, 0x1477a2908 and the Curve8s at
+// 0x1477a2b04/0x1477a2b48 of the balance prepare.
+inline constexpr std::uintptr_t runtime_globals = 0x77a1000;
+inline constexpr std::uint32_t runtime_globals_bytes = 0x2000;
 // 2D curves (curve_evaluate_float_surface): asset+0x20 records of 0x10 B (tagged FloatCurve* +0, outer key +8), count
 // at records-4; a FloatCurve keeps its points at +0x18, count at points-4. Jump: tuning block +0x7e0; slide: the
 // asset's PhysicsSlide block (+0x2ad8) +0x320.

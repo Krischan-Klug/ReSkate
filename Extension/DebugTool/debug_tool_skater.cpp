@@ -367,6 +367,7 @@ void record_step(std::uint32_t kind, std::uintptr_t core, std::uintptr_t state, 
             {tag("TUNA"), pointer_at(image_base + tuning::asset_global), tuning::asset_size},
             {tag("TUNB"), pointer_at(core + tuning::core_tuning_block), 0xc98},
             {tag("MATH"), image_base + step::math_constants, step::math_constants_bytes},
+            {tag("GLOB"), image_base + step::runtime_globals, step::runtime_globals_bytes},
         };
         const auto block = pointer_at(core + tuning::core_tuning_block);
         const auto jump = curve2d_bytes(block ? pointer_at(block + step::block_jump_curve2d) : 0);
